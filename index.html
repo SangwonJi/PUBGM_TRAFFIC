@@ -147,6 +147,42 @@
             min-height: 900px;
             background: #2d3238;
             border: 1px solid #3b5a50;
+            position: relative;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(38, 41, 49, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            color: #d4d4d4;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #3b5a50;
+            border-top: 3px solid #4a6b5f;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 12px;
+            color: #8b949e;
         }
         
         .filter-controls {
@@ -225,7 +261,12 @@
         
         <div class="content">
             <div class="stats-grid" id="stats"></div>
-            <div id="treemap"></div>
+            <div id="treemap">
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">데이터를 생성하고 있습니다...</div>
+                </div>
+            </div>
         </div>
         
         <div class="footer">
@@ -340,20 +381,27 @@
                 'Tristan da Cunha', 'Pitcairn', 'Norfolk Island', 'Christmas Island', 'Cocos Islands', 'Heard Island', 'Bouvet Island', 'Svalbard', 'Jan Mayen', 'Antarctica'
             ];
             
-            // Generate data for 250 countries
+            // Generate data for 250 countries (optimized)
+            // Use seeded random for consistent performance
+            let seed = 12345;
+            function seededRandom() {
+                seed = (seed * 9301 + 49297) % 233280;
+                return seed / 233280;
+            }
+            
             for (let i = 0; i < 250; i++) {
                 const countryName = i < countryNames.length ? countryNames[i] : `Country${i + 1}`;
                 countries.push(countryName);
                 
-                // Generate realistic revenue data with variation
+                // Generate realistic revenue data with variation (optimized)
                 const baseRevenue = 500000 * Math.pow(0.92, i); // Decreasing trend
-                const variation = baseRevenue * 0.1 * (Math.random() - 0.5); // ±10% variation
+                const variation = baseRevenue * 0.1 * (seededRandom() - 0.5); // ±10% variation
                 const revenue1 = Math.max(1000, Math.round(baseRevenue + variation));
                 
-                const change1 = 1 + (Math.random() * 0.1 - 0.05); // ±5% change
+                const change1 = 1 + (seededRandom() * 0.1 - 0.05); // ±5% change
                 const revenue2 = Math.round(revenue1 * change1);
                 
-                const change2 = 1 + (Math.random() * 0.15 - 0.05); // ±5-10% change
+                const change2 = 1 + (seededRandom() * 0.15 - 0.05); // ±5-10% change
                 const revenue3 = Math.round(revenue2 * change2);
                 
                 day1.push(revenue1);
@@ -439,7 +487,7 @@
             let indices;
             if (sortBy === 'revenue') {
                 indices = Array.from({length: data.Country.length}, (_, i) => i)
-                    .sort((a, b) => totalRevenue[b] - totalRevenue[a])
+                .sort((a, b) => totalRevenue[b] - totalRevenue[a])
                     .slice(0, topCount);
             } else {
                 indices = Array.from({length: data.Country.length}, (_, i) => i)
@@ -473,96 +521,138 @@
         }
 
         function createTreemap(data) {
-            const stats = calculateStats(data);
-            const topCount = parseInt(document.getElementById('topCount')?.value || 250) || 250;
-            const groupByContinent = document.getElementById('groupByContinent')?.checked ?? true;
+            // Show loading indicator
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                loadingOverlay.style.display = 'flex';
+            }
             
-            document.getElementById('headerSubtitle').textContent = `${topCount} Countries - 3-Day Revenue Analysis`;
-            
-            document.getElementById('stats').innerHTML = `
-                <div class="stat-item">
-                    <div class="stat-label">Total Revenue</div>
-                    <div class="stat-value">$${(stats.totalSum / 1000000).toFixed(2)}M</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Avg Change</div>
-                    <div class="stat-value ${stats.avgChange >= 0 ? 'positive' : 'negative'}">${stats.avgChange >= 0 ? '+' : ''}${stats.avgChange.toFixed(2)}%</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Max Increase</div>
-                    <div class="stat-value positive">+${stats.maxChange.toFixed(2)}%</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Max Decrease</div>
-                    <div class="stat-value negative">${stats.minChange.toFixed(2)}%</div>
-                </div>
-            `;
-            
-            const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
-            
-            // 변화율에 따라 글자 크기 계산 (Finviz 스타일)
-            // 많은 국가를 표시할 때는 글자 크기를 조정
-            const totalCountries = stats.topCountries.length;
-            const scaleFactor = totalCountries > 100 ? 0.7 : (totalCountries > 50 ? 0.85 : 1);
-            
-            let labels = [];
-            let parents = [];
-            let values = [];
-            let colors = [];
-            
-            if (groupByContinent) {
-                // Group by continent (Finviz style)
-                const continentData = {};
+            // Use setTimeout to allow UI to update
+            setTimeout(() => {
+                const stats = calculateStats(data);
+                const topCount = parseInt(document.getElementById('topCount')?.value || 250) || 250;
+                const groupByContinent = document.getElementById('groupByContinent')?.checked ?? true;
                 
-                // Organize countries by continent
-                stats.topCountries.forEach((country, i) => {
-                    const continent = getContinent(country);
-                    if (!continentData[continent]) {
-                        continentData[continent] = {
-                            countries: [],
-                            revenues: [],
-                            changes: []
-                        };
-                    }
-                    continentData[continent].countries.push(country);
-                    continentData[continent].revenues.push(stats.topRevenue[i]);
-                    continentData[continent].changes.push(stats.topChange[i]);
-                });
+                document.getElementById('headerSubtitle').textContent = `${topCount} Countries - 3-Day Revenue Analysis`;
+            
+                document.getElementById('stats').innerHTML = `
+                    <div class="stat-item">
+                        <div class="stat-label">Total Revenue</div>
+                        <div class="stat-value">$${(stats.totalSum / 1000000).toFixed(2)}M</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Avg Change</div>
+                        <div class="stat-value ${stats.avgChange >= 0 ? 'positive' : 'negative'}">${stats.avgChange >= 0 ? '+' : ''}${stats.avgChange.toFixed(2)}%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Max Increase</div>
+                        <div class="stat-value positive">+${stats.maxChange.toFixed(2)}%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Max Decrease</div>
+                        <div class="stat-value negative">${stats.minChange.toFixed(2)}%</div>
+                    </div>
+                `;
                 
-                // Create labels for continents and countries
-                const continents = Object.keys(continentData).sort((a, b) => {
-                    const sumA = continentData[a].revenues.reduce((x, y) => x + y, 0);
-                    const sumB = continentData[b].revenues.reduce((x, y) => x + y, 0);
-                    return sumB - sumA;
-                });
+                const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
+            
+                // 변화율에 따라 글자 크기 계산 (Finviz 스타일)
+                // 많은 국가를 표시할 때는 글자 크기를 조정
+                const totalCountries = stats.topCountries.length;
+                const scaleFactor = totalCountries > 100 ? 0.7 : (totalCountries > 50 ? 0.85 : 1);
                 
-                continents.forEach(continent => {
-                    const data = continentData[continent];
-                    const continentTotal = data.revenues.reduce((a, b) => a + b, 0);
-                    const continentAvgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
+                let labels = [];
+                let parents = [];
+                let values = [];
+                let colors = [];
+                
+                if (groupByContinent) {
+                    // Group by continent (Finviz style)
+                    const continentData = {};
                     
-                    // Add continent label (parent)
-                    labels.push(`<b style="font-size:14px;color:#d4d4d4">${continent}</b><br><span style="font-size:11px;color:#8b949e">$${(continentTotal / 1000).toFixed(0)}K</span><br><span style="font-size:12px;font-weight:bold;color:${continentAvgChange >= 0 ? '#3b5a50' : '#d73a49'}">${continentAvgChange >= 0 ? '+' : ''}${continentAvgChange.toFixed(1)}%</span>`);
-                    parents.push('');
-                    values.push(continentTotal);
+                    // Organize countries by continent
+                    stats.topCountries.forEach((country, i) => {
+                        const continent = getContinent(country);
+                        if (!continentData[continent]) {
+                            continentData[continent] = {
+                                countries: [],
+                                revenues: [],
+                                changes: []
+                            };
+                        }
+                        continentData[continent].countries.push(country);
+                        continentData[continent].revenues.push(stats.topRevenue[i]);
+                        continentData[continent].changes.push(stats.topChange[i]);
+                    });
                     
-                    // Continent color based on average change
-                    const continentIntensity = Math.min(Math.abs(continentAvgChange) / absMaxChange, 1);
-                    if (continentAvgChange >= 0) {
-                        const r = Math.round(59 - (20 * (1 - continentIntensity)));
-                        const g = Math.round(90 - (30 * (1 - continentIntensity)));
-                        const b = Math.round(80 - (20 * (1 - continentIntensity)));
-                        colors.push(`rgb(${r}, ${g}, ${b})`);
-                    } else {
-                        const r = Math.round(215 - (50 * (1 - continentIntensity)));
-                        const g = Math.round(58 - (20 * (1 - continentIntensity)));
-                        const b = Math.round(73 - (20 * (1 - continentIntensity)));
-                        colors.push(`rgb(${r}, ${g}, ${b})`);
-                    }
+                    // Create labels for continents and countries
+                    const continents = Object.keys(continentData).sort((a, b) => {
+                        const sumA = continentData[a].revenues.reduce((x, y) => x + y, 0);
+                        const sumB = continentData[b].revenues.reduce((x, y) => x + y, 0);
+                        return sumB - sumA;
+                    });
                     
-                    // Add country labels (children)
-                    data.countries.forEach((country, i) => {
-                        const changeAbs = Math.abs(data.changes[i]);
+                    continents.forEach(continent => {
+                        const data = continentData[continent];
+                        const continentTotal = data.revenues.reduce((a, b) => a + b, 0);
+                        const continentAvgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
+                        
+                        // Add continent label (parent)
+                        labels.push(`<b style="font-size:14px;color:#d4d4d4">${continent}</b><br><span style="font-size:11px;color:#8b949e">$${(continentTotal / 1000).toFixed(0)}K</span><span style="font-size:12px;font-weight:bold;color:${continentAvgChange >= 0 ? '#3b5a50' : '#d73a49'}">${continentAvgChange >= 0 ? '+' : ''}${continentAvgChange.toFixed(1)}%</span>`);
+                        parents.push('');
+                        values.push(continentTotal);
+                        
+                        // Continent color based on average change
+                        const continentIntensity = Math.min(Math.abs(continentAvgChange) / absMaxChange, 1);
+                        if (continentAvgChange >= 0) {
+                            const r = Math.round(59 - (20 * (1 - continentIntensity)));
+                            const g = Math.round(90 - (30 * (1 - continentIntensity)));
+                            const b = Math.round(80 - (20 * (1 - continentIntensity)));
+                            colors.push(`rgb(${r}, ${g}, ${b})`);
+                        } else {
+                            const r = Math.round(215 - (50 * (1 - continentIntensity)));
+                            const g = Math.round(58 - (20 * (1 - continentIntensity)));
+                            const b = Math.round(73 - (20 * (1 - continentIntensity)));
+                            colors.push(`rgb(${r}, ${g}, ${b})`);
+                        }
+                        
+                        // Add country labels (children)
+                        data.countries.forEach((country, i) => {
+                            const changeAbs = Math.abs(data.changes[i]);
+                            const intensity = changeAbs / absMaxChange;
+                            
+                            const baseSize = Math.round(9 * scaleFactor);
+                            const maxSize = Math.round(16 * scaleFactor);
+                            const fontSize = Math.round(baseSize + (maxSize - baseSize) * intensity);
+                            
+                            const countrySize = Math.max(7, Math.round(fontSize * 1.1));
+                            const revenueSize = Math.max(6, Math.round(fontSize * 0.9));
+                            const changeSize = Math.max(7, fontSize);
+                            
+                            labels.push(`<b style="font-size:${countrySize}px;color:#d4d4d4">${country}</b><br><span style="font-size:${revenueSize}px;color:#8b949e">$${(data.revenues[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${data.changes[i] >= 0 ? '#3b5a50' : '#d73a49'}">${data.changes[i] >= 0 ? '+' : ''}${data.changes[i].toFixed(1)}%</span>`);
+                            parents.push(continent);
+                            values.push(data.revenues[i]);
+                            
+                            // Country color based on change
+                            if (data.changes[i] >= 0) {
+                                const countryIntensity = Math.min(data.changes[i] / absMaxChange, 1);
+                                const r = Math.round(59 - (20 * (1 - countryIntensity)));
+                                const g = Math.round(90 - (30 * (1 - countryIntensity)));
+                                const b = Math.round(80 - (20 * (1 - countryIntensity)));
+                                colors.push(`rgb(${r}, ${g}, ${b})`);
+                            } else {
+                                const countryIntensity = Math.min(Math.abs(data.changes[i]) / absMaxChange, 1);
+                                const r = Math.round(215 - (50 * (1 - countryIntensity)));
+                                const g = Math.round(58 - (20 * (1 - countryIntensity)));
+                                const b = Math.round(73 - (20 * (1 - countryIntensity)));
+                                colors.push(`rgb(${r}, ${g}, ${b})`);
+                            }
+                        });
+                    });
+                } else {
+                    // Original flat structure
+                    labels = stats.topCountries.map((country, i) => {
+                        const changeAbs = Math.abs(stats.topChange[i]);
                         const intensity = changeAbs / absMaxChange;
                         
                         const baseSize = Math.round(9 * scaleFactor);
@@ -573,102 +663,86 @@
                         const revenueSize = Math.max(6, Math.round(fontSize * 0.9));
                         const changeSize = Math.max(7, fontSize);
                         
-                        labels.push(`<b style="font-size:${countrySize}px;color:#d4d4d4">${country}</b><br><span style="font-size:${revenueSize}px;color:#8b949e">$${(data.revenues[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${data.changes[i] >= 0 ? '#3b5a50' : '#d73a49'}">${data.changes[i] >= 0 ? '+' : ''}${data.changes[i].toFixed(1)}%</span>`);
-                        parents.push(continent);
-                        values.push(data.revenues[i]);
-                        
-                        // Country color based on change
-                        if (data.changes[i] >= 0) {
-                            const countryIntensity = Math.min(data.changes[i] / absMaxChange, 1);
-                            const r = Math.round(59 - (20 * (1 - countryIntensity)));
-                            const g = Math.round(90 - (30 * (1 - countryIntensity)));
-                            const b = Math.round(80 - (20 * (1 - countryIntensity)));
-                            colors.push(`rgb(${r}, ${g}, ${b})`);
+                        return `<b style="font-size:${countrySize}px;color:#d4d4d4">${country}</b><br><span style="font-size:${revenueSize}px;color:#8b949e">$${(stats.topRevenue[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${stats.topChange[i] >= 0 ? '#3b5a50' : '#d73a49'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`;
+                    });
+                    
+                    parents = stats.topCountries.map(() => '');
+                    values = stats.topRevenue;
+                    colors = stats.topChange.map(change => {
+                        if (change >= 0) {
+                            const intensity = Math.min(change / absMaxChange, 1);
+                            const r = Math.round(59 - (20 * (1 - intensity)));
+                            const g = Math.round(90 - (30 * (1 - intensity)));
+                            const b = Math.round(80 - (20 * (1 - intensity)));
+                            return `rgb(${r}, ${g}, ${b})`;
                         } else {
-                            const countryIntensity = Math.min(Math.abs(data.changes[i]) / absMaxChange, 1);
-                            const r = Math.round(215 - (50 * (1 - countryIntensity)));
-                            const g = Math.round(58 - (20 * (1 - countryIntensity)));
-                            const b = Math.round(73 - (20 * (1 - countryIntensity)));
-                            colors.push(`rgb(${r}, ${g}, ${b})`);
+                            const intensity = Math.min(Math.abs(change) / absMaxChange, 1);
+                            const r = Math.round(215 - (50 * (1 - intensity)));
+                            const g = Math.round(58 - (20 * (1 - intensity)));
+                            const b = Math.round(73 - (20 * (1 - intensity)));
+                            return `rgb(${r}, ${g}, ${b})`;
                         }
                     });
-                });
-            } else {
-                // Original flat structure
-                labels = stats.topCountries.map((country, i) => {
-                    const changeAbs = Math.abs(stats.topChange[i]);
-                    const intensity = changeAbs / absMaxChange;
-                    
-                    const baseSize = Math.round(9 * scaleFactor);
-                    const maxSize = Math.round(16 * scaleFactor);
-                    const fontSize = Math.round(baseSize + (maxSize - baseSize) * intensity);
-                    
-                    const countrySize = Math.max(7, Math.round(fontSize * 1.1));
-                    const revenueSize = Math.max(6, Math.round(fontSize * 0.9));
-                    const changeSize = Math.max(7, fontSize);
-                    
-                    return `<b style="font-size:${countrySize}px;color:#d4d4d4">${country}</b><br><span style="font-size:${revenueSize}px;color:#8b949e">$${(stats.topRevenue[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${stats.topChange[i] >= 0 ? '#3b5a50' : '#d73a49'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`;
-                });
+                }
                 
-                parents = stats.topCountries.map(() => '');
-                values = stats.topRevenue;
-                colors = stats.topChange.map(change => {
-                    if (change >= 0) {
-                        const intensity = Math.min(change / absMaxChange, 1);
-                        const r = Math.round(59 - (20 * (1 - intensity)));
-                        const g = Math.round(90 - (30 * (1 - intensity)));
-                        const b = Math.round(80 - (20 * (1 - intensity)));
-                        return `rgb(${r}, ${g}, ${b})`;
-                    } else {
-                        const intensity = Math.min(Math.abs(change) / absMaxChange, 1);
-                        const r = Math.round(215 - (50 * (1 - intensity)));
-                        const g = Math.round(58 - (20 * (1 - intensity)));
-                        const b = Math.round(73 - (20 * (1 - intensity)));
-                        return `rgb(${r}, ${g}, ${b})`;
+                const trace = {
+                    type: 'treemap',
+                    labels: labels,
+                    parents: parents,
+                    values: values,
+                    marker: {
+                        colors: colors,
+                        line: { width: 2, color: '#1a1d23' },
+                        pad: { b: 4, l: 4, r: 4, t: 4 }
+                    },
+                    textinfo: 'label',
+                    textfont: { 
+                        family: 'Arial, Helvetica, sans-serif'
+                    },
+                    hovertemplate: '<b>%{label}</b><br>Revenue: $%{value:,.0f}<extra></extra>',
+                    textposition: 'middle center',
+                    branchvalues: 'total'
+                };
+                
+                // Adjust height based on number of countries
+                const treemapHeight = Math.max(900, Math.min(1800, 600 + topCount * 2));
+                
+                const layout = {
+                    title: { text: '', font: { size: 0 } },
+                    paper_bgcolor: '#2d3238',
+                    plot_bgcolor: '#2d3238',
+                    margin: { l: 0, r: 0, t: 0, b: 0 },
+                    height: treemapHeight,
+                    font: {
+                        family: 'Arial, Helvetica, sans-serif',
+                        size: 11,
+                        color: '#d4d4d4'
+                    }
+                };
+                
+                Plotly.newPlot('treemap', [trace], layout, {responsive: true}).then(() => {
+                    // Hide loading indicator after plot is rendered
+                    if (loadingOverlay) {
+                        loadingOverlay.style.display = 'none';
                     }
                 });
-            }
-            
-            const trace = {
-                type: 'treemap',
-                labels: labels,
-                parents: parents,
-                values: values,
-                marker: {
-                    colors: colors,
-                    line: { width: 2, color: '#1a1d23' },
-                    pad: { b: 4, l: 4, r: 4, t: 4 }
-                },
-                textinfo: 'label',
-                textfont: { 
-                    family: 'Arial, Helvetica, sans-serif'
-                },
-                hovertemplate: '<b>%{label}</b><br>Revenue: $%{value:,.0f}<extra></extra>',
-                textposition: 'middle center',
-                branchvalues: 'total'
-            };
-            
-            // Adjust height based on number of countries
-            const treemapHeight = Math.max(900, Math.min(1800, 600 + topCount * 2));
-            
-            const layout = {
-                title: { text: '', font: { size: 0 } },
-                paper_bgcolor: '#2d3238',
-                plot_bgcolor: '#2d3238',
-                margin: { l: 0, r: 0, t: 0, b: 0 },
-                height: treemapHeight,
-                font: {
-                    family: 'Arial, Helvetica, sans-serif',
-                    size: 11,
-                    color: '#d4d4d4'
-                }
-            };
-            
-            Plotly.newPlot('treemap', [trace], layout, {responsive: true});
+            }, 50); // Small delay to show loading indicator
         }
 
         window.onload = function() {
-            createTreemap(currentData);
+            // Show initial loading message
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                const loadingText = loadingOverlay.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.textContent = '250개 국가 데이터를 생성하고 있습니다...';
+                }
+            }
+            
+            // Create treemap with slight delay to show loading indicator
+            setTimeout(() => {
+                createTreemap(currentData);
+            }, 100);
         };
     </script>
 </body>
