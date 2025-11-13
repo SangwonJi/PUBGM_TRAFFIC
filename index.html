@@ -305,13 +305,30 @@
                 </div>
             `;
             
-            const labels = stats.topCountries.map((country, i) => 
-                `<b style="font-size:11px;color:#d4d4d4">${country}</b><br><span style="font-size:10px;color:#8b949e">$${(stats.topRevenue[i] / 1000).toFixed(0)}K</span><br><span style="font-size:10px;color:${stats.topChange[i] >= 0 ? '#3b5a50' : '#d73a49'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`
-            );
+            const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
+            
+            // 변화율에 따라 글자 크기 계산 (Finviz 스타일)
+            const labels = stats.topCountries.map((country, i) => {
+                const changeAbs = Math.abs(stats.topChange[i]);
+                const intensity = changeAbs / absMaxChange; // 0 ~ 1
+                
+                // 기본 크기에서 변화율에 따라 조정
+                // 최소: 9px, 최대: 16px
+                const baseSize = 9;
+                const maxSize = 16;
+                const fontSize = Math.round(baseSize + (maxSize - baseSize) * intensity);
+                
+                // 국가명 크기 (약간 더 크게)
+                const countrySize = Math.round(fontSize * 1.1);
+                // 매출액 크기 (약간 작게)
+                const revenueSize = Math.round(fontSize * 0.9);
+                // 변화율 크기 (가장 크게 강조)
+                const changeSize = fontSize;
+                
+                return `<b style="font-size:${countrySize}px;color:#d4d4d4">${country}</b><br><span style="font-size:${revenueSize}px;color:#8b949e">$${(stats.topRevenue[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${stats.topChange[i] >= 0 ? '#3b5a50' : '#d73a49'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`;
+            });
             
             const parents = stats.topCountries.map(() => '');
-            
-            const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
             const colors = stats.topChange.map(change => {
                 if (change >= 0) {
                     const intensity = Math.min(change / absMaxChange, 1);
@@ -341,9 +358,8 @@
                     pad: { b: 3, l: 3, r: 3, t: 3 }
                 },
                 textinfo: 'label',
+                // textfont는 개별 라벨에서 인라인 스타일로 처리되므로 여기서는 기본값만 설정
                 textfont: { 
-                    size: 11, 
-                    color: '#d4d4d4',
                     family: 'Arial, Helvetica, sans-serif'
                 },
                 hovertemplate: '<b>%{label}</b><br>Revenue: $%{value:,.0f}<extra></extra>',
