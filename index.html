@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic by Country</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            background-color: #262931;
+            color: #d4d4d4;
+            padding: 0;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1920px;
+            margin: 0 auto;
+            background: #262931;
+        }
+        
+        .header {
+            background-color: #2d3238;
+            border-bottom: 1px solid #3b5a50;
+            padding: 8px 12px;
+        }
+        
+        .header h1 {
+            font-size: 12px;
+            font-weight: bold;
+            color: #d4d4d4;
+            margin: 0;
+        }
+        
+        .header p {
+            font-size: 10px;
+            color: #8b949e;
+            margin-top: 2px;
+        }
+        
+        .toolbar {
+            padding: 6px 12px;
+            background: #2d3238;
+            border-bottom: 1px solid #3b5a50;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .toolbar input[type="file"] {
+            padding: 3px 6px;
+            border: 1px solid #3b5a50;
+            background: #262931;
+            color: #d4d4d4;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+        
+        .toolbar button {
+            padding: 3px 10px;
+            background-color: #3b5a50;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: Arial, Helvetica, sans-serif;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+        
+        .toolbar button:hover {
+            background-color: #4a6b5f;
+        }
+        
+        .status-badge {
+            background: #3b5a50;
+            color: #ffffff;
+            padding: 3px 8px;
+            font-size: 10px;
+            border-radius: 3px;
+        }
+        
+        .content {
+            padding: 12px;
+            background: #262931;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            margin-bottom: 12px;
+            border: 1px solid #3b5a50;
+            background: #2d3238;
+        }
+        
+        .stat-item {
+            background: #2d3238;
+            padding: 8px 12px;
+            border-right: 1px solid #3b5a50;
+            text-align: left;
+        }
+        
+        .stat-item:last-child {
+            border-right: none;
+        }
+        
+        .stat-item:nth-child(even) {
+            background-color: #262931;
+        }
+        
+        .stat-label {
+            font-size: 9px;
+            color: #8b949e;
+            margin-bottom: 4px;
+            font-weight: normal;
+            text-transform: uppercase;
+        }
+        
+        .stat-value {
+            font-size: 13px;
+            font-weight: bold;
+            color: #d4d4d4;
+            line-height: 1.2;
+        }
+        
+        .stat-value.positive {
+            color: #3b5a50;
+        }
+        
+        .stat-value.negative {
+            color: #d73a49;
+        }
+        
+        #treemap {
+            width: 100%;
+            min-height: 900px;
+            background: #2d3238;
+            border: 1px solid #3b5a50;
+        }
+        
+        .filter-controls {
+            padding: 6px 12px;
+            background: #2d3238;
+            border-bottom: 1px solid #3b5a50;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .filter-controls label {
+            font-size: 10px;
+            color: #8b949e;
+        }
+        
+        .filter-controls input[type="number"] {
+            padding: 3px 6px;
+            border: 1px solid #3b5a50;
+            background: #262931;
+            color: #d4d4d4;
+            font-size: 11px;
+            width: 80px;
+        }
+        
+        .filter-controls select {
+            padding: 3px 6px;
+            border: 1px solid #3b5a50;
+            background: #262931;
+            color: #d4d4d4;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        
+        .filter-controls input[type="checkbox"] {
+            margin-left: 8px;
+            cursor: pointer;
+        }
+        
+        .footer {
+            padding: 6px 12px;
+            border-top: 1px solid #3b5a50;
+            background: #2d3238;
+            font-size: 10px;
+            color: #8b949e;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Traffic by Country</h1>
+            <p id="headerSubtitle">250 Countries - 3-Day Revenue Analysis</p>
+        </div>
+        
+        <div class="toolbar">
+            <input type="file" id="csvFile" accept=".csv" />
+            <button onclick="loadCSV()">Load CSV</button>
+            <div class="status-badge" id="status">Sample Data (250 Countries)</div>
+        </div>
+        
+        <div class="filter-controls">
+            <label>Show Top:</label>
+            <input type="number" id="topCount" value="250" min="1" max="250" onchange="updateDisplay()" />
+            <label>Sort By:</label>
+            <select id="sortBy" onchange="updateDisplay()">
+                <option value="revenue">Total Revenue</option>
+                <option value="change">Change %</option>
+            </select>
+            <label style="margin-left: 12px;">
+                <input type="checkbox" id="groupByContinent" checked onchange="updateDisplay()" />
+                Group by Continent
+            </label>
+        </div>
+        
+        <div class="content">
+            <div class="stats-grid" id="stats"></div>
+            <div id="treemap"></div>
+        </div>
+        
+        <div class="footer">
+            CSV Format: Country,Day1,Day2,Day3 | Hover for details
+        </div>
+    </div>
+
+    <script>
+        // Country to continent mapping
+        const countryToContinent = {
+            // North America
+            'USA': 'NORTH AMERICA', 'Canada': 'NORTH AMERICA', 'Mexico': 'NORTH AMERICA',
+            'Guatemala': 'NORTH AMERICA', 'Honduras': 'NORTH AMERICA', 'El Salvador': 'NORTH AMERICA',
+            'Nicaragua': 'NORTH AMERICA', 'Costa Rica': 'NORTH AMERICA', 'Panama': 'NORTH AMERICA',
+            'Cuba': 'NORTH AMERICA', 'Jamaica': 'NORTH AMERICA', 'Haiti': 'NORTH AMERICA',
+            'Dominican Republic': 'NORTH AMERICA', 'Trinidad': 'NORTH AMERICA', 'Barbados': 'NORTH AMERICA',
+            'Bahamas': 'NORTH AMERICA', 'Belize': 'NORTH AMERICA',
+            // South America
+            'Brazil': 'SOUTH AMERICA', 'Argentina': 'SOUTH AMERICA', 'Chile': 'SOUTH AMERICA',
+            'Colombia': 'SOUTH AMERICA', 'Peru': 'SOUTH AMERICA', 'Ecuador': 'SOUTH AMERICA',
+            'Venezuela': 'SOUTH AMERICA', 'Uruguay': 'SOUTH AMERICA', 'Paraguay': 'SOUTH AMERICA',
+            'Bolivia': 'SOUTH AMERICA', 'Suriname': 'SOUTH AMERICA', 'Guyana': 'SOUTH AMERICA',
+            'French Guiana': 'SOUTH AMERICA',
+            // Europe
+            'Germany': 'EUROPE', 'UK': 'EUROPE', 'France': 'EUROPE', 'Italy': 'EUROPE',
+            'Spain': 'EUROPE', 'Netherlands': 'EUROPE', 'Poland': 'EUROPE', 'Belgium': 'EUROPE',
+            'Sweden': 'EUROPE', 'Switzerland': 'EUROPE', 'Greece': 'EUROPE', 'Portugal': 'EUROPE',
+            'Czech Republic': 'EUROPE', 'Romania': 'EUROPE', 'Hungary': 'EUROPE', 'Bulgaria': 'EUROPE',
+            'Croatia': 'EUROPE', 'Serbia': 'EUROPE', 'Slovakia': 'EUROPE', 'Slovenia': 'EUROPE',
+            'Austria': 'EUROPE', 'Denmark': 'EUROPE', 'Norway': 'EUROPE', 'Finland': 'EUROPE',
+            'Ireland': 'EUROPE', 'Cyprus': 'EUROPE', 'Albania': 'EUROPE', 'Bosnia': 'EUROPE',
+            'Macedonia': 'EUROPE', 'Montenegro': 'EUROPE', 'Kosovo': 'EUROPE', 'Iceland': 'EUROPE',
+            'Luxembourg': 'EUROPE', 'Malta': 'EUROPE', 'Monaco': 'EUROPE', 'Andorra': 'EUROPE',
+            'Liechtenstein': 'EUROPE', 'San Marino': 'EUROPE', 'Vatican': 'EUROPE',
+            'Jersey': 'EUROPE', 'Guernsey': 'EUROPE', 'Isle of Man': 'EUROPE',
+            'Faroe Islands': 'EUROPE', 'Greenland': 'EUROPE', 'Svalbard': 'EUROPE',
+            'Ukraine': 'EUROPE', 'Lithuania': 'EUROPE', 'Latvia': 'EUROPE', 'Estonia': 'EUROPE',
+            'Moldova': 'EUROPE', 'Belarus': 'EUROPE',
+            // Asia
+            'China': 'ASIA', 'India': 'ASIA', 'Japan': 'ASIA', 'Korea': 'ASIA',
+            'Indonesia': 'ASIA', 'Thailand': 'ASIA', 'Vietnam': 'ASIA', 'Philippines': 'ASIA',
+            'Malaysia': 'ASIA', 'Singapore': 'ASIA', 'Pakistan': 'ASIA', 'Bangladesh': 'ASIA',
+            'Myanmar': 'ASIA', 'Cambodia': 'ASIA', 'Laos': 'ASIA', 'Nepal': 'ASIA',
+            'Sri Lanka': 'ASIA', 'Afghanistan': 'ASIA', 'Iraq': 'ASIA', 'Iran': 'ASIA',
+            'Israel': 'ASIA', 'Jordan': 'ASIA', 'Lebanon': 'ASIA', 'Kuwait': 'ASIA',
+            'Qatar': 'ASIA', 'Oman': 'ASIA', 'Bahrain': 'ASIA', 'Yemen': 'ASIA',
+            'Syria': 'ASIA', 'Saudi Arabia': 'ASIA', 'UAE': 'ASIA', 'Turkey': 'ASIA',
+            'Kazakhstan': 'ASIA', 'Uzbekistan': 'ASIA', 'Kyrgyzstan': 'ASIA', 'Tajikistan': 'ASIA',
+            'Turkmenistan': 'ASIA', 'Azerbaijan': 'ASIA', 'Armenia': 'ASIA', 'Georgia': 'ASIA',
+            'Mongolia': 'ASIA', 'North Korea': 'ASIA', 'Taiwan': 'ASIA', 'Hong Kong': 'ASIA',
+            'Macau': 'ASIA', 'Brunei': 'ASIA', 'East Timor': 'ASIA', 'Bhutan': 'ASIA',
+            'Maldives': 'ASIA',
+            // Africa
+            'South Africa': 'AFRICA', 'Egypt': 'AFRICA', 'Nigeria': 'AFRICA',
+            'Morocco': 'AFRICA', 'Algeria': 'AFRICA', 'Tunisia': 'AFRICA', 'Libya': 'AFRICA',
+            'Sudan': 'AFRICA', 'Ethiopia': 'AFRICA', 'Kenya': 'AFRICA', 'Tanzania': 'AFRICA',
+            'Uganda': 'AFRICA', 'Ghana': 'AFRICA', 'Ivory Coast': 'AFRICA', 'Senegal': 'AFRICA',
+            'Cameroon': 'AFRICA', 'Angola': 'AFRICA', 'Mozambique': 'AFRICA', 'Madagascar': 'AFRICA',
+            'Zimbabwe': 'AFRICA', 'Zambia': 'AFRICA', 'Malawi': 'AFRICA', 'Rwanda': 'AFRICA',
+            'Burundi': 'AFRICA', 'Somalia': 'AFRICA', 'Djibouti': 'AFRICA', 'Eritrea': 'AFRICA',
+            'Mauritania': 'AFRICA', 'Mali': 'AFRICA', 'Burkina Faso': 'AFRICA', 'Niger': 'AFRICA',
+            'Chad': 'AFRICA', 'Central African Republic': 'AFRICA', 'Congo': 'AFRICA',
+            'DR Congo': 'AFRICA', 'Gabon': 'AFRICA', 'Equatorial Guinea': 'AFRICA',
+            'Sao Tome': 'AFRICA', 'Guinea': 'AFRICA', 'Sierra Leone': 'AFRICA', 'Liberia': 'AFRICA',
+            'Togo': 'AFRICA', 'Benin': 'AFRICA', 'Mauritius': 'AFRICA', 'Seychelles': 'AFRICA',
+            'Comoros': 'AFRICA', 'Cape Verde': 'AFRICA', 'Guinea-Bissau': 'AFRICA',
+            'Gambia': 'AFRICA', 'Lesotho': 'AFRICA', 'Swaziland': 'AFRICA', 'Botswana': 'AFRICA',
+            'Namibia': 'AFRICA',
+            // Oceania
+            'Australia': 'OCEANIA', 'New Zealand': 'OCEANIA', 'Papua New Guinea': 'OCEANIA',
+            'Fiji': 'OCEANIA', 'Solomon Islands': 'OCEANIA', 'Vanuatu': 'OCEANIA',
+            'Samoa': 'OCEANIA', 'Tonga': 'OCEANIA', 'Palau': 'OCEANIA', 'Micronesia': 'OCEANIA',
+            'Marshall Islands': 'OCEANIA', 'Norfolk Island': 'OCEANIA', 'Christmas Island': 'OCEANIA',
+            'Cocos Islands': 'OCEANIA',
+            // Other
+            'Russia': 'RUSSIA & CIS'
+        };
+        
+        function getContinent(country) {
+            return countryToContinent[country] || 'OTHER';
+        }
+        
+        // Generate sample data for 250 countries
+        function generateSampleData() {
+            const countries = [];
+            const day1 = [];
+            const day2 = [];
+            const day3 = [];
+            
+            // Real country names (extended list)
+            const countryNames = [
+                'USA', 'China', 'India', 'Japan', 'Korea', 'Brazil', 'Germany', 'UK', 'France', 'Russia',
+                'Indonesia', 'Thailand', 'Vietnam', 'Philippines', 'Mexico', 'Turkey', 'Spain', 'Italy', 'Canada', 'Australia',
+                'Argentina', 'Netherlands', 'Saudi Arabia', 'South Africa', 'Poland', 'Belgium', 'Sweden', 'Switzerland', 'Chile', 'Colombia',
+                'Malaysia', 'Singapore', 'UAE', 'Egypt', 'Nigeria', 'Pakistan', 'Bangladesh', 'Myanmar', 'Cambodia', 'Laos',
+                'Nepal', 'Sri Lanka', 'Afghanistan', 'Iraq', 'Iran', 'Israel', 'Jordan', 'Lebanon', 'Kuwait', 'Qatar',
+                'Oman', 'Bahrain', 'Yemen', 'Syria', 'Cyprus', 'Greece', 'Portugal', 'Czech Republic', 'Romania', 'Hungary',
+                'Bulgaria', 'Croatia', 'Serbia', 'Slovakia', 'Slovenia', 'Austria', 'Denmark', 'Norway', 'Finland', 'Ireland',
+                'New Zealand', 'Peru', 'Ecuador', 'Venezuela', 'Uruguay', 'Paraguay', 'Bolivia', 'Guatemala', 'Honduras', 'El Salvador',
+                'Nicaragua', 'Costa Rica', 'Panama', 'Cuba', 'Jamaica', 'Haiti', 'Dominican Republic', 'Trinidad', 'Barbados', 'Bahamas',
+                'Morocco', 'Algeria', 'Tunisia', 'Libya', 'Sudan', 'Ethiopia', 'Kenya', 'Tanzania', 'Uganda', 'Ghana',
+                'Ivory Coast', 'Senegal', 'Cameroon', 'Angola', 'Mozambique', 'Madagascar', 'Zimbabwe', 'Zambia', 'Malawi', 'Rwanda',
+                'Burundi', 'Somalia', 'Djibouti', 'Eritrea', 'Mauritania', 'Mali', 'Burkina Faso', 'Niger', 'Chad', 'Central African Republic',
+                'Congo', 'DR Congo', 'Gabon', 'Equatorial Guinea', 'Sao Tome', 'Guinea', 'Sierra Leone', 'Liberia', 'Togo', 'Benin',
+                'Kazakhstan', 'Uzbekistan', 'Kyrgyzstan', 'Tajikistan', 'Turkmenistan', 'Azerbaijan', 'Armenia', 'Georgia', 'Moldova', 'Belarus',
+                'Ukraine', 'Lithuania', 'Latvia', 'Estonia', 'Mongolia', 'North Korea', 'Taiwan', 'Hong Kong', 'Macau', 'Brunei',
+                'East Timor', 'Papua New Guinea', 'Fiji', 'Solomon Islands', 'Vanuatu', 'Samoa', 'Tonga', 'Palau', 'Micronesia', 'Marshall Islands',
+                'Maldives', 'Mauritius', 'Seychelles', 'Comoros', 'Cape Verde', 'Guinea-Bissau', 'Gambia', 'Lesotho', 'Swaziland', 'Botswana',
+                'Namibia', 'Albania', 'Bosnia', 'Macedonia', 'Montenegro', 'Kosovo', 'Iceland', 'Luxembourg', 'Malta', 'Monaco',
+                'Andorra', 'Liechtenstein', 'San Marino', 'Vatican', 'Lichtenstein', 'Jersey', 'Guernsey', 'Isle of Man', 'Faroe Islands', 'Greenland',
+                'Bhutan', 'Maldives', 'Suriname', 'Guyana', 'French Guiana', 'Belize', 'Falkland Islands', 'South Georgia', 'Saint Helena', 'Ascension',
+                'Tristan da Cunha', 'Pitcairn', 'Norfolk Island', 'Christmas Island', 'Cocos Islands', 'Heard Island', 'Bouvet Island', 'Svalbard', 'Jan Mayen', 'Antarctica'
+            ];
+            
+            // Generate data for 250 countries
+            for (let i = 0; i < 250; i++) {
+                const countryName = i < countryNames.length ? countryNames[i] : `Country${i + 1}`;
+                countries.push(countryName);
+                
+                // Generate realistic revenue data with variation
+                const baseRevenue = 500000 * Math.pow(0.92, i); // Decreasing trend
+                const variation = baseRevenue * 0.1 * (Math.random() - 0.5); // ±10% variation
+                const revenue1 = Math.max(1000, Math.round(baseRevenue + variation));
+                
+                const change1 = 1 + (Math.random() * 0.1 - 0.05); // ±5% change
+                const revenue2 = Math.round(revenue1 * change1);
+                
+                const change2 = 1 + (Math.random() * 0.15 - 0.05); // ±5-10% change
+                const revenue3 = Math.round(revenue2 * change2);
+                
+                day1.push(revenue1);
+                day2.push(revenue2);
+                day3.push(revenue3);
+            }
+            
+            return { Country: countries, Day1: day1, Day2: day2, Day3: day3 };
+        }
+
+        const sampleData = generateSampleData();
+        let currentData = sampleData;
+
+        function loadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file.');
+                return;
+            }
+            
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const data = results.data;
+                    const processed = processData(data);
+                    if (processed) {
+                        currentData = processed;
+                        document.getElementById('status').textContent = 'CSV Loaded';
+                        createTreemap(currentData);
+                    }
+                },
+                error: function(error) {
+                    alert('Error reading CSV: ' + error);
+                }
+            });
+        }
+
+        function processData(data) {
+            try {
+                const countries = [];
+                const day1 = [];
+                const day2 = [];
+                const day3 = [];
+                
+                data.forEach(row => {
+                    if (row.Country && row.Day1 && row.Day2 && row.Day3) {
+                        countries.push(row.Country);
+                        day1.push(parseInt(row.Day1));
+                        day2.push(parseInt(row.Day2));
+                        day3.push(parseInt(row.Day3));
+                    }
+                });
+                
+                if (countries.length === 0) {
+                    alert('No valid data found. Check CSV format.');
+                    return null;
+                }
+                
+                return { Country: countries, Day1: day1, Day2: day2, Day3: day3 };
+            } catch (error) {
+                alert('Error processing data: ' + error);
+                return null;
+            }
+        }
+
+        function calculateStats(data) {
+            const totalRevenue = [];
+            const changePercent = [];
+            
+            for (let i = 0; i < data.Country.length; i++) {
+                const total = data.Day1[i] + data.Day2[i] + data.Day3[i];
+                totalRevenue.push(total);
+                const change = ((data.Day3[i] - data.Day1[i]) / data.Day1[i]) * 100;
+                changePercent.push(change);
+            }
+            
+            const topCount = parseInt(document.getElementById('topCount')?.value || 250) || 250;
+            const sortBy = document.getElementById('sortBy')?.value || 'revenue';
+            
+            let indices;
+            if (sortBy === 'revenue') {
+                indices = Array.from({length: data.Country.length}, (_, i) => i)
+                    .sort((a, b) => totalRevenue[b] - totalRevenue[a])
+                    .slice(0, topCount);
+            } else {
+                indices = Array.from({length: data.Country.length}, (_, i) => i)
+                    .sort((a, b) => Math.abs(changePercent[b]) - Math.abs(changePercent[a]))
+                    .slice(0, topCount);
+            }
+            
+            const topCountries = indices.map(i => data.Country[i]);
+            const topRevenue = indices.map(i => totalRevenue[i]);
+            const topChange = indices.map(i => changePercent[i]);
+            
+            const totalSum = topRevenue.reduce((a, b) => a + b, 0);
+            const avgChange = topChange.reduce((a, b) => a + b, 0) / topChange.length;
+            const maxChange = Math.max(...topChange);
+            const minChange = Math.min(...topChange);
+            
+            return {
+                totalSum,
+                avgChange,
+                maxChange,
+                minChange,
+                topCountries,
+                topRevenue,
+                topChange,
+                indices
+            };
+        }
+        
+        function updateDisplay() {
+            createTreemap(currentData);
+        }
+
+        function createTreemap(data) {
+            const stats = calculateStats(data);
+            const topCount = parseInt(document.getElementById('topCount')?.value || 250) || 250;
+            const groupByContinent = document.getElementById('groupByContinent')?.checked ?? true;
+            
+            document.getElementById('headerSubtitle').textContent = `${topCount} Countries - 3-Day Revenue Analysis`;
+            
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-item">
+                    <div class="stat-label">Total Revenue</div>
+                    <div class="stat-value">$${(stats.totalSum / 1000000).toFixed(2)}M</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Avg Change</div>
+                    <div class="stat-value ${stats.avgChange >= 0 ? 'positive' : 'negative'}">${stats.avgChange >= 0 ? '+' : ''}${stats.avgChange.toFixed(2)}%</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Max Increase</div>
+                    <div class="stat-value positive">+${stats.maxChange.toFixed(2)}%</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Max Decrease</div>
+                    <div class="stat-value negative">${stats.minChange.toFixed(2)}%</div>
+                </div>
+            `;
+            
+            const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
+            
+            // 변화율에 따라 글자 크기 계산 (Finviz 스타일)
+            // 많은 국가를 표시할 때는 글자 크기를 조정
+            const totalCountries = stats.topCountries.length;
+            const scaleFactor = totalCountries > 100 ? 0.7 : (totalCountries > 50 ? 0.85 : 1);
+            
+            let labels = [];
+            let parents = [];
+            let values = [];
+            let colors = [];
+            
+            if (groupByContinent) {
+                // Group by continent (Finviz style)
+                const continentData = {};
+                
+                // Organize countries by continent
+                stats.topCountries.forEach((country, i) => {
+                    const continent = getContinent(country);
+                    if (!continentData[continent]) {
+                        continentData[continent] = {
+                            countries: [],
+                            revenues: [],
+                            changes: []
+                        };
+                    }
+                    continentData[continent].countries.push(country);
+                    continentData[continent].revenues.push(stats.topRevenue[i]);
+                    continentData[continent].changes.push(stats.topChange[i]);
+                });
+                
+                // Create labels for continents and countries
+                const continents = Object.keys(continentData).sort((a, b) => {
+                    const sumA = continentData[a].revenues.reduce((x, y) => x + y, 0);
+                    const sumB = continentData[b].revenues.reduce((x, y) => x + y, 0);
+                    return sumB - sumA;
+                });
+                
+                continents.forEach(continent => {
+                    const data = continentData[continent];
+                    const continentTotal = data.revenues.reduce((a, b) => a + b, 0);
+                    const continentAvgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
+                    
+                    // Add continent label (parent)
+                    labels.push(`<b style="font-size:14px;color:#d4d4d4">${continent}</b><br><span style="font-size:11px;color:#8b949e">$${(continentTotal / 1000).toFixed(0)}K</span><br><span style="font-size:12px;font-weight:bold;color:${continentAvgChange >= 0 ? '#3b5a50' : '#d73a49'}">${continentAvgChange >= 0 ? '+' : ''}${continentAvgChange.toFixed(1)}%</span>`);
+                    parents.push('');
+                    values.push(continentTotal);
+                    
+                    // Continent color based on average change
+                    const continentIntensity = Math.min(Math.abs(continentAvgChange) / absMaxChange, 1);
+                    if (continentAvgChange >= 0) {
+                        const r = Math.round(59 - (20 * (1 - continentIntensity)));
+                        const g = Math.round(90 - (30 * (1 - continentIntensity)));
+                        const b = Math.round(80 - (20 * (1 - continentIntensity)));
+                        colors.push(`rgb(${r}, ${g}, ${b})`);
+                    } else {
+                        const r = Math.round(215 - (50 * (1 - continentIntensity)));
+                        const g = Math.round(58 - (20 * (1 - continentIntensity)));
+                        const b = Math.round(73 - (20 * (1 - continentIntensity)));
+                        colors.push(`rgb(${r}, ${g}, ${b})`);
+                    }
+                    
+                    // Add country labels (children)
+                    data.countries.forEach((country, i) => {
+                        const changeAbs = Math.abs(data.changes[i]);
+                        const intensity = changeAbs / absMaxChange;
+                        
+                        const baseSize = Math.round(9 * scaleFactor);
+                        const maxSize = Math.round(16 * scaleFactor);
+                        const fontSize = Math.round(baseSize + (maxSize - baseSize) * intensity);
+                        
+                        const countrySize = Math.max(7, Math.round(fontSize * 1.1));
+                        const revenueSize = Math.max(6, Math.round(fontSize * 0.9));
+                        const changeSize = Math.max(7, fontSize);
+                        
+                        labels.push(`<b style="font-size:${countrySize}px;color:#d4d4d4">${country}</b><br><span style="font-size:${revenueSize}px;color:#8b949e">$${(data.revenues[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${data.changes[i] >= 0 ? '#3b5a50' : '#d73a49'}">${data.changes[i] >= 0 ? '+' : ''}${data.changes[i].toFixed(1)}%</span>`);
+                        parents.push(continent);
+                        values.push(data.revenues[i]);
+                        
+                        // Country color based on change
+                        if (data.changes[i] >= 0) {
+                            const countryIntensity = Math.min(data.changes[i] / absMaxChange, 1);
+                            const r = Math.round(59 - (20 * (1 - countryIntensity)));
+                            const g = Math.round(90 - (30 * (1 - countryIntensity)));
+                            const b = Math.round(80 - (20 * (1 - countryIntensity)));
+                            colors.push(`rgb(${r}, ${g}, ${b})`);
+                        } else {
+                            const countryIntensity = Math.min(Math.abs(data.changes[i]) / absMaxChange, 1);
+                            const r = Math.round(215 - (50 * (1 - countryIntensity)));
+                            const g = Math.round(58 - (20 * (1 - countryIntensity)));
+                            const b = Math.round(73 - (20 * (1 - countryIntensity)));
+                            colors.push(`rgb(${r}, ${g}, ${b})`);
+                        }
+                    });
+                });
+            } else {
+                // Original flat structure
+                labels = stats.topCountries.map((country, i) => {
+                    const changeAbs = Math.abs(stats.topChange[i]);
+                    const intensity = changeAbs / absMaxChange;
+                    
+                    const baseSize = Math.round(9 * scaleFactor);
+                    const maxSize = Math.round(16 * scaleFactor);
+                    const fontSize = Math.round(baseSize + (maxSize - baseSize) * intensity);
+                    
+                    const countrySize = Math.max(7, Math.round(fontSize * 1.1));
+                    const revenueSize = Math.max(6, Math.round(fontSize * 0.9));
+                    const changeSize = Math.max(7, fontSize);
+                    
+                    return `<b style="font-size:${countrySize}px;color:#d4d4d4">${country}</b><br><span style="font-size:${revenueSize}px;color:#8b949e">$${(stats.topRevenue[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${stats.topChange[i] >= 0 ? '#3b5a50' : '#d73a49'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`;
+                });
+                
+                parents = stats.topCountries.map(() => '');
+                values = stats.topRevenue;
+                colors = stats.topChange.map(change => {
+                    if (change >= 0) {
+                        const intensity = Math.min(change / absMaxChange, 1);
+                        const r = Math.round(59 - (20 * (1 - intensity)));
+                        const g = Math.round(90 - (30 * (1 - intensity)));
+                        const b = Math.round(80 - (20 * (1 - intensity)));
+                        return `rgb(${r}, ${g}, ${b})`;
+                    } else {
+                        const intensity = Math.min(Math.abs(change) / absMaxChange, 1);
+                        const r = Math.round(215 - (50 * (1 - intensity)));
+                        const g = Math.round(58 - (20 * (1 - intensity)));
+                        const b = Math.round(73 - (20 * (1 - intensity)));
+                        return `rgb(${r}, ${g}, ${b})`;
+                    }
+                });
+            }
+            
+            const trace = {
+                type: 'treemap',
+                labels: labels,
+                parents: parents,
+                values: values,
+                marker: {
+                    colors: colors,
+                    line: { width: 2, color: '#1a1d23' },
+                    pad: { b: 4, l: 4, r: 4, t: 4 }
+                },
+                textinfo: 'label',
+                textfont: { 
+                    family: 'Arial, Helvetica, sans-serif'
+                },
+                hovertemplate: '<b>%{label}</b><br>Revenue: $%{value:,.0f}<extra></extra>',
+                textposition: 'middle center',
+                branchvalues: 'total'
+            };
+            
+            // Adjust height based on number of countries
+            const treemapHeight = Math.max(900, Math.min(1800, 600 + topCount * 2));
+            
+            const layout = {
+                title: { text: '', font: { size: 0 } },
+                paper_bgcolor: '#2d3238',
+                plot_bgcolor: '#2d3238',
+                margin: { l: 0, r: 0, t: 0, b: 0 },
+                height: treemapHeight,
+                font: {
+                    family: 'Arial, Helvetica, sans-serif',
+                    size: 11,
+                    color: '#d4d4d4'
+                }
+            };
+            
+            Plotly.newPlot('treemap', [trace], layout, {responsive: true});
+        }
+
+        window.onload = function() {
+            createTreemap(currentData);
+        };
+    </script>
+</body>
+</html>
