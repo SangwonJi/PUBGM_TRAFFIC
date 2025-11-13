@@ -14,44 +14,46 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 0;
             min-height: 100vh;
+            color: #333;
         }
         
         .container {
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
+            background: #1a1a1a;
+            color: #ffffff;
+            padding: 24px 32px;
+            border-bottom: 3px solid #0066cc;
         }
         
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
         }
         
         .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+            font-size: 13px;
+            color: #b0b0b0;
+            font-weight: 400;
         }
         
         .controls {
-            padding: 20px 40px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
+            padding: 16px 32px;
+            background: #fafafa;
+            border-bottom: 1px solid #e0e0e0;
             display: flex;
-            gap: 20px;
+            gap: 16px;
             align-items: center;
             flex-wrap: wrap;
         }
@@ -59,141 +61,151 @@
         .file-upload {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
         
         .file-upload input[type="file"] {
-            padding: 8px;
-            border: 2px dashed #667eea;
-            border-radius: 8px;
+            padding: 6px 12px;
+            border: 1px solid #d0d0d0;
             background: white;
             cursor: pointer;
+            font-size: 13px;
         }
         
         .file-upload button {
-            padding: 10px 20px;
-            background: #667eea;
+            padding: 6px 16px;
+            background: #0066cc;
             color: white;
             border: none;
-            border-radius: 8px;
             cursor: pointer;
-            font-weight: bold;
-            transition: background 0.3s;
+            font-weight: 500;
+            font-size: 13px;
+            transition: background 0.2s;
         }
         
         .file-upload button:hover {
-            background: #5568d3;
+            background: #0052a3;
         }
         
         .info-badge {
             background: #28a745;
             color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
-            font-weight: bold;
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 500;
         }
         
         .content {
-            padding: 40px;
+            padding: 24px 32px;
         }
         
         #treemap {
             width: 100%;
-            height: 800px;
+            height: 900px;
             background: white;
-            border-radius: 10px;
         }
         
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            margin-bottom: 24px;
+            background: #e0e0e0;
+            border: 1px solid #e0e0e0;
         }
         
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #ffffff;
             padding: 20px;
-            border-radius: 10px;
-            text-align: center;
+            text-align: left;
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        .stat-card:last-child {
+            border-right: none;
         }
         
         .stat-card h3 {
-            font-size: 0.9em;
-            opacity: 0.9;
-            margin-bottom: 10px;
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .stat-card .value {
-            font-size: 2em;
-            font-weight: bold;
+            font-size: 28px;
+            font-weight: 600;
+            color: #1a1a1a;
+            line-height: 1.2;
         }
         
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
+        .stat-card .value.positive {
+            color: #28a745;
         }
         
-        .loading::after {
-            content: '...';
-            animation: dots 1.5s steps(4, end) infinite;
-        }
-        
-        @keyframes dots {
-            0%, 20% { content: '.'; }
-            40% { content: '..'; }
-            60%, 100% { content: '...'; }
+        .stat-card .value.negative {
+            color: #dc3545;
         }
         
         .instructions {
-            background: #e7f3ff;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 5px solid #0066cc;
+            background: #f8f9fa;
+            padding: 16px;
+            margin-bottom: 24px;
+            border: 1px solid #e0e0e0;
+            font-size: 12px;
         }
         
         .instructions h3 {
-            color: #0066cc;
-            margin-bottom: 10px;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
         }
         
         .instructions ul {
             margin-left: 20px;
-            color: #333;
+            color: #666;
+            line-height: 1.6;
         }
         
         .instructions li {
-            margin: 5px 0;
+            margin: 4px 0;
+        }
+        
+        .instructions code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 PUBG Mobile Revenue Treemap</h1>
-            <p>Interactive Visualization - Finviz Style</p>
+            <h1>PUBG Mobile Revenue by Country</h1>
+            <p>Top 15 Countries - 3-Day Revenue Analysis</p>
         </div>
         
         <div class="controls">
             <div class="file-upload">
                 <input type="file" id="csvFile" accept=".csv" />
-                <button onclick="loadCSV()">📁 CSV 파일 로드</button>
+                <button onclick="loadCSV()">Load CSV</button>
             </div>
-            <div class="info-badge" id="status">샘플 데이터 사용 중</div>
+            <div class="info-badge" id="status">Sample Data</div>
         </div>
         
         <div class="content">
             <div class="instructions">
-                <h3>📋 사용 방법</h3>
+                <h3>Data Format</h3>
                 <ul>
-                    <li>CSV 파일 형식: <code>Country,Day1,Day2,Day3</code> 컬럼이 필요합니다</li>
-                    <li>파일을 선택하고 "CSV 파일 로드" 버튼을 클릭하세요</li>
-                    <li>차트에 마우스를 올리면 상세 정보를 볼 수 있습니다</li>
-                    <li>샘플 데이터가 기본으로 표시됩니다</li>
+                    <li>CSV format: <code>Country,Day1,Day2,Day3</code> columns required</li>
+                    <li>Select file and click "Load CSV" button</li>
+                    <li>Hover over chart for detailed information</li>
+                    <li>Sample data is displayed by default</li>
                 </ul>
             </div>
             
@@ -220,7 +232,7 @@
             const file = fileInput.files[0];
             
             if (!file) {
-                alert('파일을 선택해주세요.');
+                alert('Please select a file.');
                 return;
             }
             
@@ -232,13 +244,13 @@
                     const processed = processData(data);
                     if (processed) {
                         currentData = processed;
-                        document.getElementById('status').textContent = 'CSV 데이터 사용 중';
+                        document.getElementById('status').textContent = 'CSV Data Loaded';
                         document.getElementById('status').style.background = '#28a745';
                         createTreemap(currentData);
                     }
                 },
                 error: function(error) {
-                    alert('CSV 파일을 읽는 중 오류가 발생했습니다: ' + error);
+                    alert('Error reading CSV file: ' + error);
                 }
             });
         }
@@ -261,13 +273,13 @@
                 });
                 
                 if (countries.length === 0) {
-                    alert('유효한 데이터를 찾을 수 없습니다. CSV 형식을 확인해주세요.');
+                    alert('No valid data found. Please check CSV format.');
                     return null;
                 }
                 
                 return { Country: countries, Day1: day1, Day2: day2, Day3: day3 };
             } catch (error) {
-                alert('데이터 처리 중 오류가 발생했습니다: ' + error);
+                alert('Error processing data: ' + error);
                 return null;
             }
         }
@@ -317,43 +329,43 @@
             // 통계 표시
             document.getElementById('stats').innerHTML = `
                 <div class="stat-card">
-                    <h3>총 매출액 (상위 15개국)</h3>
-                    <div class="value">${(stats.totalSum / 1000000).toFixed(2)}M</div>
+                    <h3>Total Revenue (Top 15)</h3>
+                    <div class="value">$${(stats.totalSum / 1000000).toFixed(2)}M</div>
                 </div>
                 <div class="stat-card">
-                    <h3>평균 변화율</h3>
-                    <div class="value">${stats.avgChange.toFixed(2)}%</div>
+                    <h3>Avg Change</h3>
+                    <div class="value ${stats.avgChange >= 0 ? 'positive' : 'negative'}">${stats.avgChange >= 0 ? '+' : ''}${stats.avgChange.toFixed(2)}%</div>
                 </div>
                 <div class="stat-card">
-                    <h3>최대 증가율</h3>
-                    <div class="value">${stats.maxChange.toFixed(2)}%</div>
+                    <h3>Max Increase</h3>
+                    <div class="value positive">+${stats.maxChange.toFixed(2)}%</div>
                 </div>
                 <div class="stat-card">
-                    <h3>최대 감소율</h3>
-                    <div class="value">${stats.minChange.toFixed(2)}%</div>
+                    <h3>Max Decrease</h3>
+                    <div class="value negative">${stats.minChange.toFixed(2)}%</div>
                 </div>
             `;
             
             // Plotly 트리맵 데이터 준비
             const labels = stats.topCountries.map((country, i) => 
-                `${country}<br>${(stats.topRevenue[i] / 1000).toFixed(0)}K<br>${stats.topChange[i].toFixed(1)}%`
+                `<b>${country}</b><br>$${(stats.topRevenue[i] / 1000).toFixed(0)}K<br><span style="color: ${stats.topChange[i] >= 0 ? '#28a745' : '#dc3545'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`
             );
             
             const parents = stats.topCountries.map(() => '');
             
-            // 색상 매핑 (Red-Yellow-Green)
+            // S&P 스타일 색상 매핑 (Red-Green, 더 명확한 대비)
             const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
             const colors = stats.topChange.map(change => {
-                const normalized = (change + absMaxChange) / (2 * absMaxChange);
-                // Red-Yellow-Green 색상 맵
-                if (normalized < 0.5) {
-                    // Red to Yellow
-                    const t = normalized * 2;
-                    return `rgb(${255}, ${Math.round(255 * t)}, 0)`;
+                if (change >= 0) {
+                    // Green scale (증가)
+                    const intensity = Math.min(change / absMaxChange, 1);
+                    const green = Math.round(40 + (215 * intensity));
+                    return `rgb(0, ${green}, 0)`;
                 } else {
-                    // Yellow to Green
-                    const t = (normalized - 0.5) * 2;
-                    return `rgb(${Math.round(255 * (1 - t))}, 255, 0)`;
+                    // Red scale (감소)
+                    const intensity = Math.min(Math.abs(change) / absMaxChange, 1);
+                    const red = Math.round(40 + (215 * intensity));
+                    return `rgb(${red}, 0, 0)`;
                 }
             });
             
@@ -364,24 +376,35 @@
                 values: stats.topRevenue,
                 marker: {
                     colors: colors,
-                    line: { width: 2, color: 'white' }
+                    line: { width: 1, color: '#ffffff' },
+                    pad: { b: 2, l: 2, r: 2, t: 2 }
                 },
                 textinfo: 'label',
+                textfont: { 
+                    size: 13, 
+                    color: '#1a1a1a',
+                    family: 'Arial, sans-serif'
+                },
                 hovertemplate: '<b>%{label}</b><br>' +
-                              '총 매출액: %{value:,.0f}<br>' +
+                              'Revenue: $%{value:,.0f}<br>' +
                               '<extra></extra>',
-                textfont: { size: 14, color: 'black' }
+                textposition: 'middle center'
             };
             
             const layout = {
                 title: {
-                    text: 'PUBG Mobile Revenue Treemap (Top 15 Countries) - Finviz Style',
-                    font: { size: 24, color: '#333' }
+                    text: '',
+                    font: { size: 0 }
                 },
-                paper_bgcolor: 'white',
-                plot_bgcolor: 'white',
-                margin: { l: 0, r: 0, t: 60, b: 0 },
-                height: 800
+                paper_bgcolor: '#ffffff',
+                plot_bgcolor: '#ffffff',
+                margin: { l: 0, r: 0, t: 0, b: 0 },
+                height: 900,
+                font: {
+                    family: 'Arial, sans-serif',
+                    size: 12,
+                    color: '#1a1a1a'
+                }
             };
             
             Plotly.newPlot('treemap', [trace], layout, {responsive: true});
