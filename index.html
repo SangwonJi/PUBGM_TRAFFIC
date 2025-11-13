@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUBG Mobile Revenue Treemap - Interactive Visualization</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            padding: 20px 40px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .file-upload {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .file-upload input[type="file"] {
+            padding: 8px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .file-upload button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        .file-upload button:hover {
+            background: #5568d3;
+        }
+        
+        .info-badge {
+            background: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        #treemap {
+            width: 100%;
+            height: 800px;
+            background: white;
+            border-radius: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+        
+        .instructions {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #0066cc;
+        }
+        
+        .instructions h3 {
+            color: #0066cc;
+            margin-bottom: 10px;
+        }
+        
+        .instructions ul {
+            margin-left: 20px;
+            color: #333;
+        }
+        
+        .instructions li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 PUBG Mobile Revenue Treemap</h1>
+            <p>Interactive Visualization - Finviz Style</p>
+        </div>
+        
+        <div class="controls">
+            <div class="file-upload">
+                <input type="file" id="csvFile" accept=".csv" />
+                <button onclick="loadCSV()">📁 CSV 파일 로드</button>
+            </div>
+            <div class="info-badge" id="status">샘플 데이터 사용 중</div>
+        </div>
+        
+        <div class="content">
+            <div class="instructions">
+                <h3>📋 사용 방법</h3>
+                <ul>
+                    <li>CSV 파일 형식: <code>Country,Day1,Day2,Day3</code> 컬럼이 필요합니다</li>
+                    <li>파일을 선택하고 "CSV 파일 로드" 버튼을 클릭하세요</li>
+                    <li>차트에 마우스를 올리면 상세 정보를 볼 수 있습니다</li>
+                    <li>샘플 데이터가 기본으로 표시됩니다</li>
+                </ul>
+            </div>
+            
+            <div class="stats" id="stats"></div>
+            
+            <div id="treemap"></div>
+        </div>
+    </div>
+
+    <script>
+        // 샘플 데이터
+        const sampleData = {
+            Country: ['USA', 'China', 'India', 'Japan', 'Korea', 'Brazil', 'Germany', 'UK', 'France', 'Russia', 'Indonesia', 'Thailand', 'Vietnam', 'Philippines', 'Mexico'],
+            Day1: [500000, 400000, 300000, 250000, 200000, 180000, 150000, 140000, 130000, 120000, 110000, 100000, 90000, 85000, 80000],
+            Day2: [520000, 410000, 320000, 240000, 210000, 190000, 155000, 145000, 135000, 125000, 115000, 105000, 95000, 90000, 85000],
+            Day3: [575000, 434000, 366000, 237500, 206000, 203400, 157500, 147000, 136500, 126000, 116600, 105000, 97200, 91800, 86400]
+        };
+
+        let currentData = sampleData;
+
+        // CSV 파일 로드
+        function loadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('파일을 선택해주세요.');
+                return;
+            }
+            
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const data = results.data;
+                    const processed = processData(data);
+                    if (processed) {
+                        currentData = processed;
+                        document.getElementById('status').textContent = 'CSV 데이터 사용 중';
+                        document.getElementById('status').style.background = '#28a745';
+                        createTreemap(currentData);
+                    }
+                },
+                error: function(error) {
+                    alert('CSV 파일을 읽는 중 오류가 발생했습니다: ' + error);
+                }
+            });
+        }
+
+        // 데이터 처리
+        function processData(data) {
+            try {
+                const countries = [];
+                const day1 = [];
+                const day2 = [];
+                const day3 = [];
+                
+                data.forEach(row => {
+                    if (row.Country && row.Day1 && row.Day2 && row.Day3) {
+                        countries.push(row.Country);
+                        day1.push(parseInt(row.Day1));
+                        day2.push(parseInt(row.Day2));
+                        day3.push(parseInt(row.Day3));
+                    }
+                });
+                
+                if (countries.length === 0) {
+                    alert('유효한 데이터를 찾을 수 없습니다. CSV 형식을 확인해주세요.');
+                    return null;
+                }
+                
+                return { Country: countries, Day1: day1, Day2: day2, Day3: day3 };
+            } catch (error) {
+                alert('데이터 처리 중 오류가 발생했습니다: ' + error);
+                return null;
+            }
+        }
+
+        // 통계 계산
+        function calculateStats(data) {
+            const totalRevenue = [];
+            const changePercent = [];
+            
+            for (let i = 0; i < data.Country.length; i++) {
+                const total = data.Day1[i] + data.Day2[i] + data.Day3[i];
+                totalRevenue.push(total);
+                const change = ((data.Day3[i] - data.Day1[i]) / data.Day1[i]) * 100;
+                changePercent.push(change);
+            }
+            
+            // 상위 15개국 선정
+            const indices = Array.from({length: data.Country.length}, (_, i) => i)
+                .sort((a, b) => totalRevenue[b] - totalRevenue[a])
+                .slice(0, 15);
+            
+            const topCountries = indices.map(i => data.Country[i]);
+            const topRevenue = indices.map(i => totalRevenue[i]);
+            const topChange = indices.map(i => changePercent[i]);
+            
+            const totalSum = topRevenue.reduce((a, b) => a + b, 0);
+            const avgChange = topChange.reduce((a, b) => a + b, 0) / topChange.length;
+            const maxChange = Math.max(...topChange);
+            const minChange = Math.min(...topChange);
+            
+            return {
+                totalSum,
+                avgChange,
+                maxChange,
+                minChange,
+                topCountries,
+                topRevenue,
+                topChange,
+                indices
+            };
+        }
+
+        // 트리맵 생성
+        function createTreemap(data) {
+            const stats = calculateStats(data);
+            
+            // 통계 표시
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card">
+                    <h3>총 매출액 (상위 15개국)</h3>
+                    <div class="value">${(stats.totalSum / 1000000).toFixed(2)}M</div>
+                </div>
+                <div class="stat-card">
+                    <h3>평균 변화율</h3>
+                    <div class="value">${stats.avgChange.toFixed(2)}%</div>
+                </div>
+                <div class="stat-card">
+                    <h3>최대 증가율</h3>
+                    <div class="value">${stats.maxChange.toFixed(2)}%</div>
+                </div>
+                <div class="stat-card">
+                    <h3>최대 감소율</h3>
+                    <div class="value">${stats.minChange.toFixed(2)}%</div>
+                </div>
+            `;
+            
+            // Plotly 트리맵 데이터 준비
+            const labels = stats.topCountries.map((country, i) => 
+                `${country}<br>${(stats.topRevenue[i] / 1000).toFixed(0)}K<br>${stats.topChange[i].toFixed(1)}%`
+            );
+            
+            const parents = stats.topCountries.map(() => '');
+            
+            // 색상 매핑 (Red-Yellow-Green)
+            const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
+            const colors = stats.topChange.map(change => {
+                const normalized = (change + absMaxChange) / (2 * absMaxChange);
+                // Red-Yellow-Green 색상 맵
+                if (normalized < 0.5) {
+                    // Red to Yellow
+                    const t = normalized * 2;
+                    return `rgb(${255}, ${Math.round(255 * t)}, 0)`;
+                } else {
+                    // Yellow to Green
+                    const t = (normalized - 0.5) * 2;
+                    return `rgb(${Math.round(255 * (1 - t))}, 255, 0)`;
+                }
+            });
+            
+            const trace = {
+                type: 'treemap',
+                labels: labels,
+                parents: parents,
+                values: stats.topRevenue,
+                marker: {
+                    colors: colors,
+                    line: { width: 2, color: 'white' }
+                },
+                textinfo: 'label',
+                hovertemplate: '<b>%{label}</b><br>' +
+                              '총 매출액: %{value:,.0f}<br>' +
+                              '<extra></extra>',
+                textfont: { size: 14, color: 'black' }
+            };
+            
+            const layout = {
+                title: {
+                    text: 'PUBG Mobile Revenue Treemap (Top 15 Countries) - Finviz Style',
+                    font: { size: 24, color: '#333' }
+                },
+                paper_bgcolor: 'white',
+                plot_bgcolor: 'white',
+                margin: { l: 0, r: 0, t: 60, b: 0 },
+                height: 800
+            };
+            
+            Plotly.newPlot('treemap', [trace], layout, {responsive: true});
+        }
+
+        // 페이지 로드 시 샘플 데이터로 트리맵 생성
+        window.onload = function() {
+            createTreemap(currentData);
+        };
+    </script>
+</body>
+</html>
