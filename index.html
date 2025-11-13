@@ -14,9 +14,10 @@
         }
         
         body {
-            font-family: 'Arial', 'Helvetica Neue', Helvetica, sans-serif;
-            background: #0d1117;
-            color: #c9d1d9;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            background-color: #f8f8f8;
+            color: #333333;
             padding: 0;
             min-height: 100vh;
         }
@@ -24,91 +25,89 @@
         .container {
             max-width: 1920px;
             margin: 0 auto;
-            background: #0d1117;
+            background: #ffffff;
         }
         
         .header {
-            background: #161b22;
-            border-bottom: 1px solid #21262d;
-            padding: 20px 40px;
+            background-color: #dcdcdc;
+            border-bottom: 1px solid #cccccc;
+            padding: 10px 15px;
         }
         
         .header h1 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #f0f6fc;
-            margin-bottom: 4px;
-            letter-spacing: 0.3px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333333;
+            margin: 0;
         }
         
         .header p {
-            font-size: 12px;
-            color: #8b949e;
-            font-weight: 400;
+            font-size: 11px;
+            color: #666666;
+            margin-top: 2px;
         }
         
         .toolbar {
-            padding: 12px 40px;
-            background: #161b22;
-            border-bottom: 1px solid #21262d;
+            padding: 8px 15px;
+            background: #e6e6e6;
+            border-bottom: 1px solid #cccccc;
             display: flex;
-            gap: 12px;
+            gap: 8px;
             align-items: center;
         }
         
         .toolbar input[type="file"] {
-            padding: 6px 10px;
-            border: 1px solid #30363d;
-            background: #0d1117;
-            color: #c9d1d9;
+            padding: 4px 8px;
+            border: 1px solid #cccccc;
+            background: #ffffff;
+            color: #333333;
             cursor: pointer;
             font-size: 12px;
-            border-radius: 3px;
+            font-family: Arial, Helvetica, sans-serif;
         }
         
         .toolbar button {
-            padding: 6px 14px;
-            background: #238636;
-            color: white;
+            padding: 4px 12px;
+            background-color: #4CAF50;
+            color: #ffffff;
             border: none;
             cursor: pointer;
-            font-weight: 500;
             font-size: 12px;
-            border-radius: 3px;
-            transition: background 0.2s;
+            font-family: Arial, Helvetica, sans-serif;
+            border-radius: 4px;
+            transition: background-color 0.2s;
         }
         
         .toolbar button:hover {
-            background: #2ea043;
+            background-color: #45a049;
         }
         
         .status-badge {
-            background: #1f6feb;
-            color: white;
+            background: #4CAF50;
+            color: #ffffff;
             padding: 4px 10px;
             font-size: 11px;
-            font-weight: 500;
-            border-radius: 3px;
+            border-radius: 4px;
         }
         
         .content {
-            padding: 30px 40px;
+            padding: 15px;
+            background: #f8f8f8;
         }
         
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 0;
-            margin-bottom: 30px;
-            border: 1px solid #21262d;
-            border-radius: 4px;
-            overflow: hidden;
+            margin-bottom: 15px;
+            border: 1px solid #cccccc;
+            background: #ffffff;
         }
         
         .stat-item {
-            background: #161b22;
-            padding: 20px 24px;
-            border-right: 1px solid #21262d;
+            background: #ffffff;
+            padding: 10px 15px;
+            border-right: 1px solid #cccccc;
             text-align: left;
         }
         
@@ -116,42 +115,46 @@
             border-right: none;
         }
         
+        .stat-item:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        
         .stat-label {
             font-size: 10px;
-            color: #8b949e;
-            margin-bottom: 8px;
-            font-weight: 500;
+            color: #666666;
+            margin-bottom: 5px;
+            font-weight: normal;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
         
         .stat-value {
-            font-size: 24px;
-            font-weight: 600;
-            color: #f0f6fc;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333333;
             line-height: 1.2;
         }
         
         .stat-value.positive {
-            color: #3fb950;
+            color: #008000;
         }
         
         .stat-value.negative {
-            color: #f85149;
+            color: #ff0000;
         }
         
         #treemap {
             width: 100%;
-            height: 950px;
-            background: #0d1117;
+            height: 900px;
+            background: #ffffff;
+            border: 1px solid #cccccc;
         }
         
         .footer {
-            padding: 20px 40px;
-            border-top: 1px solid #21262d;
-            background: #161b22;
+            padding: 8px 15px;
+            border-top: 1px solid #cccccc;
+            background: #e6e6e6;
             font-size: 11px;
-            color: #8b949e;
+            color: #666666;
             text-align: center;
         }
     </style>
@@ -160,7 +163,7 @@
     <div class="container">
         <div class="header">
             <h1>PUBG Mobile Revenue by Country</h1>
-            <p>Top 15 Countries • 3-Day Revenue Analysis</p>
+            <p>Top 15 Countries - 3-Day Revenue Analysis</p>
         </div>
         
         <div class="toolbar">
@@ -207,7 +210,6 @@
                     if (processed) {
                         currentData = processed;
                         document.getElementById('status').textContent = 'CSV Loaded';
-                        document.getElementById('status').style.background = '#238636';
                         createTreemap(currentData);
                     }
                 },
@@ -304,7 +306,7 @@
             `;
             
             const labels = stats.topCountries.map((country, i) => 
-                `<b style="font-size:14px;color:#f0f6fc">${country}</b><br><span style="font-size:12px;color:#8b949e">$${(stats.topRevenue[i] / 1000).toFixed(0)}K</span><br><span style="font-size:11px;color:${stats.topChange[i] >= 0 ? '#3fb950' : '#f85149'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`
+                `<b style="font-size:12px;color:#333333">${country}</b><br><span style="font-size:11px;color:#666666">$${(stats.topRevenue[i] / 1000).toFixed(0)}K</span><br><span style="font-size:11px;color:${stats.topChange[i] >= 0 ? '#008000' : '#ff0000'}">${stats.topChange[i] >= 0 ? '+' : ''}${stats.topChange[i].toFixed(1)}%</span>`
             );
             
             const parents = stats.topCountries.map(() => '');
@@ -313,11 +315,11 @@
             const colors = stats.topChange.map(change => {
                 if (change >= 0) {
                     const intensity = Math.min(change / absMaxChange, 1);
-                    const green = Math.round(30 + (220 * intensity));
+                    const green = Math.round(128 + (127 * intensity));
                     return `rgb(0, ${green}, 0)`;
                 } else {
                     const intensity = Math.min(Math.abs(change) / absMaxChange, 1);
-                    const red = Math.round(30 + (220 * intensity));
+                    const red = Math.round(128 + (127 * intensity));
                     return `rgb(${red}, 0, 0)`;
                 }
             });
@@ -329,14 +331,14 @@
                 values: stats.topRevenue,
                 marker: {
                     colors: colors,
-                    line: { width: 2, color: '#0d1117' },
-                    pad: { b: 4, l: 4, r: 4, t: 4 }
+                    line: { width: 1, color: '#cccccc' },
+                    pad: { b: 3, l: 3, r: 3, t: 3 }
                 },
                 textinfo: 'label',
                 textfont: { 
                     size: 12, 
-                    color: '#f0f6fc',
-                    family: 'Arial, sans-serif'
+                    color: '#333333',
+                    family: 'Arial, Helvetica, sans-serif'
                 },
                 hovertemplate: '<b>%{label}</b><br>Revenue: $%{value:,.0f}<extra></extra>',
                 textposition: 'middle center'
@@ -344,14 +346,14 @@
             
             const layout = {
                 title: { text: '', font: { size: 0 } },
-                paper_bgcolor: '#0d1117',
-                plot_bgcolor: '#0d1117',
+                paper_bgcolor: '#ffffff',
+                plot_bgcolor: '#ffffff',
                 margin: { l: 0, r: 0, t: 0, b: 0 },
-                height: 950,
+                height: 900,
                 font: {
-                    family: 'Arial, sans-serif',
+                    family: 'Arial, Helvetica, sans-serif',
                     size: 12,
-                    color: '#c9d1d9'
+                    color: '#333333'
                 }
             };
             
