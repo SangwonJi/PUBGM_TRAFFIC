@@ -214,13 +214,6 @@
             position: relative;
         }
         
-        #continentBarChart {
-            width: 100%;
-            height: 120px;
-            background: #0d1117;
-            border: 1px solid #30363d;
-        }
-        
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -332,7 +325,6 @@
         
         <div class="content">
             <div class="stats-grid" id="stats"></div>
-            <div id="continentBarChart" style="margin-bottom: 12px; display: none;"></div>
             <div id="treemap">
                 <div class="loading-overlay" id="loadingOverlay">
                     <div class="loading-spinner"></div>
@@ -667,82 +659,7 @@
                         return sumB - sumA;
                     });
                     
-                    // Create bar chart for continents at the top
-                    if (groupByContinent && continents.length > 0) {
-                        const continentBarData = continents.map(continent => {
-                            const data = continentData[continent];
-                            const total = data.revenues.reduce((a, b) => a + b, 0);
-                            const avgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
-                            return {
-                                name: continent,
-                                total: total,
-                                change: avgChange
-                            };
-                        });
-                        
-                        const maxTotal = Math.max(...continentBarData.map(d => d.total));
-                        const barColors = continentBarData.map(d => {
-                            const intensity = Math.min(Math.abs(d.change) / absMaxChange, 1);
-                            if (d.change >= 0) {
-                                const g = Math.round(255 * intensity);
-                                return `rgb(0, ${g}, 0)`;
-                            } else {
-                                const r = Math.round(255 * intensity);
-                                return `rgb(${r}, 0, 0)`;
-                            }
-                        });
-                        
-                        const barTrace = {
-                            x: continentBarData.map(d => d.name),
-                            y: continentBarData.map(d => d.total),
-                            type: 'bar',
-                            marker: {
-                                color: barColors,
-                                line: { width: 1, color: '#0d1117' }
-                            },
-                            text: continentBarData.map(d => `${(d.total / 1000).toFixed(0)}K<br>${d.change >= 0 ? '+' : ''}${d.change.toFixed(1)}%`),
-                            textposition: 'outside',
-                            textfont: {
-                                size: 14,
-                                color: '#ffffff'
-                            },
-                            hovertemplate: '<b>%{x}</b><br>Traffic: %{y:,.0f}<br>Change: %{text}<extra></extra>'
-                        };
-                        
-                        const barLayout = {
-                            paper_bgcolor: '#0d1117',
-                            plot_bgcolor: '#0d1117',
-                            margin: { l: 40, r: 40, t: 20, b: 60 },
-                            height: 120,
-                            font: {
-                                family: 'Arial, Helvetica, sans-serif',
-                                size: 12,
-                                color: '#ffffff'
-                            },
-                            xaxis: {
-                                tickfont: { size: 11, color: '#ffffff' },
-                                gridcolor: '#30363d'
-                            },
-                            yaxis: {
-                                tickfont: { size: 11, color: '#ffffff' },
-                                gridcolor: '#30363d',
-                                showgrid: true
-                            },
-                            showlegend: false
-                        };
-                        
-                        const barChartDiv = document.getElementById('continentBarChart');
-                        if (barChartDiv) {
-                            barChartDiv.style.display = 'block';
-                            Plotly.newPlot('continentBarChart', [barTrace], barLayout, {responsive: true});
-                        }
-                    } else {
-                        const barChartDiv = document.getElementById('continentBarChart');
-                        if (barChartDiv) {
-                            barChartDiv.style.display = 'none';
-                        }
-                    }
-                    
+                    // Group countries by continent in the treemap
                     continents.forEach(continent => {
                         const data = continentData[continent];
                         const continentTotal = data.revenues.reduce((a, b) => a + b, 0);
@@ -843,25 +760,33 @@
                     });
                 }
             
-            const trace = {
-                type: 'treemap',
-                labels: labels,
-                parents: parents,
+                const trace = {
+                    type: 'treemap',
+                    labels: labels,
+                    parents: parents,
                     values: values,
-                marker: {
-                    colors: colors,
-                        line: { width: 2, color: '#0d1117' }, // Dark border like Finviz
-                        pad: { b: 6, l: 6, r: 6, t: 6 } // More padding for cleaner look
-                },
-                textinfo: 'label',
-                textfont: { 
+                    marker: {
+                        colors: colors,
+                        line: { 
+                            width: groupByContinent ? 4 : 2, // Thicker border for continent grouping
+                            color: groupByContinent ? '#ffffff' : '#0d1117' // White border to separate continents
+                        },
+                        pad: { 
+                            b: groupByContinent ? 10 : 6, // More padding between continent groups
+                            l: groupByContinent ? 10 : 6,
+                            r: groupByContinent ? 10 : 6,
+                            t: groupByContinent ? 10 : 6
+                        }
+                    },
+                    textinfo: 'label',
+                    textfont: { 
                         family: 'Arial, Helvetica, sans-serif',
                         color: '#ffffff'
-                },
+                    },
                     hovertemplate: '<b>%{label}</b><br>Traffic: %{value:,.0f}<extra></extra>',
                     textposition: 'middle center',
                     branchvalues: 'total'
-            };
+                };
                 
                 // Adjust height based on number of countries
                 const treemapHeight = Math.max(900, Math.min(1800, 600 + topCount * 2));
