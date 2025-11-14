@@ -370,7 +370,7 @@
             'Ukraine': 'EUROPE', 'Lithuania': 'EUROPE', 'Latvia': 'EUROPE', 'Estonia': 'EUROPE',
             'Moldova': 'EUROPE', 'Belarus': 'EUROPE',
             // Asia
-            'China': 'ASIA', 'India': 'ASIA', 'Japan': 'ASIA', 'Korea': 'ASIA',
+            'China': 'ASIA', 'India': 'ASIA', 'Japan': 'ASIA', 'Korea': 'ASIA', 'South Korea': 'ASIA',
             'Indonesia': 'ASIA', 'Thailand': 'ASIA', 'Vietnam': 'ASIA', 'Philippines': 'ASIA',
             'Malaysia': 'ASIA', 'Singapore': 'ASIA', 'Pakistan': 'ASIA', 'Bangladesh': 'ASIA',
             'Myanmar': 'ASIA', 'Cambodia': 'ASIA', 'Laos': 'ASIA', 'Nepal': 'ASIA',
@@ -652,6 +652,13 @@
                         continentData[continent].changes.push(stats.topChange[i]);
                     });
                     
+                    // Debug: Log continent grouping
+                    console.log('Continent grouping:', Object.keys(continentData).map(c => ({
+                        continent: c,
+                        count: continentData[c].countries.length,
+                        countries: continentData[c].countries.slice(0, 5)
+                    })));
+                    
                     // Create labels for continents and countries
                     const continents = Object.keys(continentData).sort((a, b) => {
                         const sumA = continentData[a].revenues.reduce((x, y) => x + y, 0);
@@ -670,8 +677,18 @@
                         parents.push('');
                         values.push(continentTotal);
                         
-                        // Continent color - neutral gray for grouping only
-                        colors.push(`rgb(60, 60, 60)`); // Neutral gray for continent grouping
+                        // Continent color - distinct colors for each continent for better visibility
+                        const continentColors = {
+                            'ASIA': 'rgb(100, 100, 150)',
+                            'EUROPE': 'rgb(150, 100, 100)',
+                            'NORTH AMERICA': 'rgb(100, 150, 100)',
+                            'SOUTH AMERICA': 'rgb(150, 150, 100)',
+                            'AFRICA': 'rgb(150, 100, 150)',
+                            'OCEANIA': 'rgb(100, 150, 150)',
+                            'RUSSIA & CIS': 'rgb(120, 120, 120)',
+                            'OTHER': 'rgb(80, 80, 80)'
+                        };
+                        colors.push(continentColors[continent] || 'rgb(60, 60, 60)');
                         
                         // Add country labels (children) - Finviz style
                         // Font size based on change intensity (like Finviz)
@@ -750,33 +767,43 @@
                     });
                 }
             
-            const trace = {
-                type: 'treemap',
-                labels: labels,
-                parents: parents,
+                const trace = {
+                    type: 'treemap',
+                    labels: labels,
+                    parents: parents,
                     values: values,
-                marker: {
-                    colors: colors,
+                    marker: {
+                        colors: colors,
                         line: { 
-                            width: groupByContinent ? 4 : 2, // Thicker border for continent grouping
+                            width: groupByContinent ? 5 : 2, // Thicker border for continent grouping
                             color: groupByContinent ? '#ffffff' : '#0d1117' // White border to separate continents
                         },
                         pad: { 
-                            b: groupByContinent ? 10 : 6, // More padding between continent groups
-                            l: groupByContinent ? 10 : 6,
-                            r: groupByContinent ? 10 : 6,
-                            t: groupByContinent ? 10 : 6
+                            b: groupByContinent ? 15 : 6, // More padding between continent groups
+                            l: groupByContinent ? 15 : 6,
+                            r: groupByContinent ? 15 : 6,
+                            t: groupByContinent ? 15 : 6
                         }
-                },
-                textinfo: 'label',
-                textfont: { 
+                    },
+                    textinfo: 'label',
+                    textfont: { 
                         family: 'Arial, Helvetica, sans-serif',
                         color: '#ffffff'
-                },
+                    },
                     hovertemplate: '<b>%{label}</b><br>Traffic: %{value:,.0f}<extra></extra>',
                     textposition: 'middle center',
                     branchvalues: 'total'
-            };
+                };
+                
+                // Debug: Log treemap data structure
+                if (groupByContinent) {
+                    console.log('Treemap structure:', {
+                        totalLabels: labels.length,
+                        totalParents: parents.length,
+                        continentCount: parents.filter(p => p === '').length,
+                        countryCount: parents.filter(p => p !== '').length
+                    });
+                }
                 
                 // Adjust height based on number of countries
                 const treemapHeight = Math.max(900, Math.min(1800, 600 + topCount * 2));
