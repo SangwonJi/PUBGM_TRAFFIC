@@ -665,23 +665,13 @@
                         const continentTotal = data.revenues.reduce((a, b) => a + b, 0);
                         const continentAvgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
                         
-                        // Add continent label (parent) - Finviz style (10x larger)
-                        const continentChangeColor = continentAvgChange >= 0 ? '#00ff00' : '#ff0000';
-                        labels.push(`<b style="font-size:200px;color:#ffffff;font-weight:bold">${continent}</b><br><span style="font-size:140px;color:#8b949e">${(continentTotal / 1000).toFixed(0)}K</span><br><span style="font-size:160px;font-weight:bold;color:${continentChangeColor}">${continentAvgChange >= 0 ? '+' : ''}${continentAvgChange.toFixed(1)}%</span>`);
+                        // Add continent label (parent) - Only continent name, no stats
+                        labels.push(`<b style="font-size:20px;color:#ffffff;font-weight:bold">${continent}</b>`);
                         parents.push('');
                         values.push(continentTotal);
                         
-                        // Continent color based on average change - Finviz bright colors
-                        const continentIntensity = Math.min(Math.abs(continentAvgChange) / absMaxChange, 1);
-                        if (continentAvgChange >= 0) {
-                            // Bright green gradient
-                            const g = Math.round(255 * continentIntensity);
-                            colors.push(`rgb(0, ${g}, 0)`);
-                        } else {
-                            // Bright red gradient
-                            const r = Math.round(255 * continentIntensity);
-                            colors.push(`rgb(${r}, 0, 0)`);
-                        }
+                        // Continent color - neutral gray for grouping only
+                        colors.push(`rgb(60, 60, 60)`); // Neutral gray for continent grouping
                         
                         // Add country labels (children) - Finviz style
                         // Font size based on change intensity (like Finviz)
@@ -690,18 +680,18 @@
                             const change = data.changes[i];
                             const changeAbs = Math.abs(change);
                             
-                            // Finviz style: font size based on change intensity, not revenue (10x larger)
+                            // Finviz style: font size based on change intensity, not revenue
                             const changeIntensity = changeAbs / absMaxChange; // 0 to 1
                             
-                            // Base size much larger, scaled by change intensity (10x multiplier)
-                            const baseSize = 200; // Minimum size (10x from 20)
-                            const maxSize = 500; // Maximum size (10x from 50)
+                            // Base size scaled by change intensity (10x smaller than before)
+                            const baseSize = 20; // Minimum size
+                            const maxSize = 50; // Maximum size
                             const fontSize = Math.round(baseSize + (maxSize - baseSize) * changeIntensity);
                             
-                            // Country name size (larger for bigger changes) - 10x larger
-                            const countrySize = Math.max(200, Math.round(fontSize * 1.2));
-                            const trafficSize = Math.max(140, Math.round(fontSize * 0.7));
-                            const changeSize = Math.max(160, Math.round(fontSize * 0.9));
+                            // Country name size (larger for bigger changes)
+                            const countrySize = Math.max(20, Math.round(fontSize * 1.2));
+                            const trafficSize = Math.max(14, Math.round(fontSize * 0.7));
+                            const changeSize = Math.max(16, Math.round(fontSize * 0.9));
                             
                             // Finviz style colors: bright green/red
                             const changeColor = change >= 0 ? '#00ff00' : '#ff0000';
@@ -730,14 +720,14 @@
                         const changeAbs = Math.abs(change);
                         const changeIntensity = changeAbs / absMaxChange;
                         
-                        // Finviz style: font size based on change intensity (10x larger)
-                        const baseSize = 120; // 10x from 12
-                        const maxSize = 300; // 10x from 30
+                        // Finviz style: font size based on change intensity
+                        const baseSize = 12; // Base size
+                        const maxSize = 30; // Maximum size
                         const fontSize = Math.round(baseSize + (maxSize - baseSize) * changeIntensity);
                         
-                        const countrySize = Math.max(120, Math.round(fontSize * 1.1));
-                        const trafficSize = Math.max(100, Math.round(fontSize * 0.8));
-                        const changeSize = Math.max(110, Math.round(fontSize * 0.9));
+                        const countrySize = Math.max(12, Math.round(fontSize * 1.1));
+                        const trafficSize = Math.max(10, Math.round(fontSize * 0.8));
+                        const changeSize = Math.max(11, Math.round(fontSize * 0.9));
                         
                         const changeColor = change >= 0 ? '#00ff00' : '#ff0000';
                         
@@ -760,13 +750,13 @@
                     });
                 }
             
-                const trace = {
-                    type: 'treemap',
-                    labels: labels,
-                    parents: parents,
+            const trace = {
+                type: 'treemap',
+                labels: labels,
+                parents: parents,
                     values: values,
-                    marker: {
-                        colors: colors,
+                marker: {
+                    colors: colors,
                         line: { 
                             width: groupByContinent ? 4 : 2, // Thicker border for continent grouping
                             color: groupByContinent ? '#ffffff' : '#0d1117' // White border to separate continents
@@ -777,16 +767,16 @@
                             r: groupByContinent ? 10 : 6,
                             t: groupByContinent ? 10 : 6
                         }
-                    },
-                    textinfo: 'label',
-                    textfont: { 
+                },
+                textinfo: 'label',
+                textfont: { 
                         family: 'Arial, Helvetica, sans-serif',
                         color: '#ffffff'
-                    },
+                },
                     hovertemplate: '<b>%{label}</b><br>Traffic: %{value:,.0f}<extra></extra>',
                     textposition: 'middle center',
                     branchvalues: 'total'
-                };
+            };
                 
                 // Adjust height based on number of countries
                 const treemapHeight = Math.max(900, Math.min(1800, 600 + topCount * 2));
