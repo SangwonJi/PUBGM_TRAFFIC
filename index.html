@@ -95,6 +95,70 @@
             background: #0d1117;
         }
         
+        .continent-bar-chart {
+            margin-bottom: 20px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            padding: 15px;
+        }
+        
+        .continent-bar {
+            margin-bottom: 12px;
+        }
+        
+        .continent-bar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #ffffff;
+        }
+        
+        .continent-bar-name {
+            font-weight: bold;
+            min-width: 150px;
+        }
+        
+        .continent-bar-value {
+            color: #8b949e;
+            font-size: 12px;
+        }
+        
+        .continent-bar-change {
+            font-weight: bold;
+            font-size: 13px;
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        .continent-bar-change.positive {
+            color: #00ff00;
+        }
+        
+        .continent-bar-change.negative {
+            color: #ff0000;
+        }
+        
+        .continent-bar-fill {
+            height: 30px;
+            background: #30363d;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .continent-bar-fill-inner {
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -148,6 +212,13 @@
             background: #0d1117;
             border: 1px solid #30363d;
             position: relative;
+        }
+        
+        #continentBarChart {
+            width: 100%;
+            height: 120px;
+            background: #0d1117;
+            border: 1px solid #30363d;
         }
         
         .loading-overlay {
@@ -261,6 +332,7 @@
         
         <div class="content">
             <div class="stats-grid" id="stats"></div>
+            <div id="continentBarChart" style="margin-bottom: 12px; display: none;"></div>
             <div id="treemap">
                 <div class="loading-overlay" id="loadingOverlay">
                     <div class="loading-spinner"></div>
@@ -595,14 +667,90 @@
                         return sumB - sumA;
                     });
                     
+                    // Create bar chart for continents at the top
+                    if (groupByContinent && continents.length > 0) {
+                        const continentBarData = continents.map(continent => {
+                            const data = continentData[continent];
+                            const total = data.revenues.reduce((a, b) => a + b, 0);
+                            const avgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
+                            return {
+                                name: continent,
+                                total: total,
+                                change: avgChange
+                            };
+                        });
+                        
+                        const maxTotal = Math.max(...continentBarData.map(d => d.total));
+                        const barColors = continentBarData.map(d => {
+                            const intensity = Math.min(Math.abs(d.change) / absMaxChange, 1);
+                            if (d.change >= 0) {
+                                const g = Math.round(255 * intensity);
+                                return `rgb(0, ${g}, 0)`;
+                            } else {
+                                const r = Math.round(255 * intensity);
+                                return `rgb(${r}, 0, 0)`;
+                            }
+                        });
+                        
+                        const barTrace = {
+                            x: continentBarData.map(d => d.name),
+                            y: continentBarData.map(d => d.total),
+                            type: 'bar',
+                            marker: {
+                                color: barColors,
+                                line: { width: 1, color: '#0d1117' }
+                            },
+                            text: continentBarData.map(d => `${(d.total / 1000).toFixed(0)}K<br>${d.change >= 0 ? '+' : ''}${d.change.toFixed(1)}%`),
+                            textposition: 'outside',
+                            textfont: {
+                                size: 14,
+                                color: '#ffffff'
+                            },
+                            hovertemplate: '<b>%{x}</b><br>Traffic: %{y:,.0f}<br>Change: %{text}<extra></extra>'
+                        };
+                        
+                        const barLayout = {
+                            paper_bgcolor: '#0d1117',
+                            plot_bgcolor: '#0d1117',
+                            margin: { l: 40, r: 40, t: 20, b: 60 },
+                            height: 120,
+                            font: {
+                                family: 'Arial, Helvetica, sans-serif',
+                                size: 12,
+                                color: '#ffffff'
+                            },
+                            xaxis: {
+                                tickfont: { size: 11, color: '#ffffff' },
+                                gridcolor: '#30363d'
+                            },
+                            yaxis: {
+                                tickfont: { size: 11, color: '#ffffff' },
+                                gridcolor: '#30363d',
+                                showgrid: true
+                            },
+                            showlegend: false
+                        };
+                        
+                        const barChartDiv = document.getElementById('continentBarChart');
+                        if (barChartDiv) {
+                            barChartDiv.style.display = 'block';
+                            Plotly.newPlot('continentBarChart', [barTrace], barLayout, {responsive: true});
+                        }
+                    } else {
+                        const barChartDiv = document.getElementById('continentBarChart');
+                        if (barChartDiv) {
+                            barChartDiv.style.display = 'none';
+                        }
+                    }
+                    
                     continents.forEach(continent => {
                         const data = continentData[continent];
                         const continentTotal = data.revenues.reduce((a, b) => a + b, 0);
                         const continentAvgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
                         
-                        // Add continent label (parent) - Finviz style
+                        // Add continent label (parent) - Finviz style (10x larger)
                         const continentChangeColor = continentAvgChange >= 0 ? '#00ff00' : '#ff0000';
-                        labels.push(`<b style="font-size:20px;color:#ffffff;font-weight:bold">${continent}</b><br><span style="font-size:14px;color:#8b949e">${(continentTotal / 1000).toFixed(0)}K</span><br><span style="font-size:16px;font-weight:bold;color:${continentChangeColor}">${continentAvgChange >= 0 ? '+' : ''}${continentAvgChange.toFixed(1)}%</span>`);
+                        labels.push(`<b style="font-size:200px;color:#ffffff;font-weight:bold">${continent}</b><br><span style="font-size:140px;color:#8b949e">${(continentTotal / 1000).toFixed(0)}K</span><br><span style="font-size:160px;font-weight:bold;color:${continentChangeColor}">${continentAvgChange >= 0 ? '+' : ''}${continentAvgChange.toFixed(1)}%</span>`);
                         parents.push('');
                         values.push(continentTotal);
                         
@@ -625,18 +773,18 @@
                             const change = data.changes[i];
                             const changeAbs = Math.abs(change);
                             
-                            // Finviz style: font size based on change intensity, not revenue
+                            // Finviz style: font size based on change intensity, not revenue (10x larger)
                             const changeIntensity = changeAbs / absMaxChange; // 0 to 1
                             
-                            // Base size much larger, scaled by change intensity (Finviz style)
-                            const baseSize = 20; // Minimum size
-                            const maxSize = 50; // Maximum size
+                            // Base size much larger, scaled by change intensity (10x multiplier)
+                            const baseSize = 200; // Minimum size (10x from 20)
+                            const maxSize = 500; // Maximum size (10x from 50)
                             const fontSize = Math.round(baseSize + (maxSize - baseSize) * changeIntensity);
                             
-                            // Country name size (larger for bigger changes)
-                            const countrySize = Math.max(20, Math.round(fontSize * 1.2));
-                            const trafficSize = Math.max(14, Math.round(fontSize * 0.7));
-                            const changeSize = Math.max(16, Math.round(fontSize * 0.9));
+                            // Country name size (larger for bigger changes) - 10x larger
+                            const countrySize = Math.max(200, Math.round(fontSize * 1.2));
+                            const trafficSize = Math.max(140, Math.round(fontSize * 0.7));
+                            const changeSize = Math.max(160, Math.round(fontSize * 0.9));
                             
                             // Finviz style colors: bright green/red
                             const changeColor = change >= 0 ? '#00ff00' : '#ff0000';
@@ -665,14 +813,14 @@
                         const changeAbs = Math.abs(change);
                         const changeIntensity = changeAbs / absMaxChange;
                         
-                        // Finviz style: font size based on change intensity
-                        const baseSize = 12;
-                        const maxSize = 30;
+                        // Finviz style: font size based on change intensity (10x larger)
+                        const baseSize = 120; // 10x from 12
+                        const maxSize = 300; // 10x from 30
                         const fontSize = Math.round(baseSize + (maxSize - baseSize) * changeIntensity);
                         
-                        const countrySize = Math.max(12, Math.round(fontSize * 1.1));
-                        const trafficSize = Math.max(10, Math.round(fontSize * 0.8));
-                        const changeSize = Math.max(11, Math.round(fontSize * 0.9));
+                        const countrySize = Math.max(120, Math.round(fontSize * 1.1));
+                        const trafficSize = Math.max(100, Math.round(fontSize * 0.8));
+                        const changeSize = Math.max(110, Math.round(fontSize * 0.9));
                         
                         const changeColor = change >= 0 ? '#00ff00' : '#ff0000';
                         
