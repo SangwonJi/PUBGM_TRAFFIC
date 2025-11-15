@@ -826,8 +826,17 @@
                         totalLabels: labels.length,
                         totalParents: parents.length,
                         continentCount: parents.filter(p => p === '').length,
-                        countryCount: parents.filter(p => p !== '').length
+                        countryCount: parents.filter(p => p !== '').length,
+                        sampleLabels: labels.slice(0, 5),
+                        sampleParents: parents.slice(0, 5),
+                        uniqueParents: [...new Set(parents)].filter(p => p !== '')
                     });
+                    
+                    // Verify parent-child relationships
+                    const continentNames = [...new Set(parents)].filter(p => p !== '');
+                    console.log('Continent names used as parents:', continentNames);
+                    const rootLabels = labels.filter((_, i) => parents[i] === '');
+                    console.log('Root level labels (continents):', rootLabels);
                 }
                 
                 // Adjust height based on number of countries
