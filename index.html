@@ -656,8 +656,15 @@
                     console.log('Continent grouping:', Object.keys(continentData).map(c => ({
                         continent: c,
                         count: continentData[c].countries.length,
-                        countries: continentData[c].countries.slice(0, 5)
+                        countries: continentData[c].countries.slice(0, 5),
+                        total: continentData[c].revenues.reduce((a, b) => a + b, 0)
                     })));
+                    
+                    // Verify all countries have valid continent mapping
+                    const unmappedCountries = stats.topCountries.filter(c => !countryToContinent[c]);
+                    if (unmappedCountries.length > 0) {
+                        console.warn('Unmapped countries:', unmappedCountries);
+                    }
                     
                     // Create labels for continents and countries
                     const continents = Object.keys(continentData).sort((a, b) => {
