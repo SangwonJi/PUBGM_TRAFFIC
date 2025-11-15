@@ -96,16 +96,36 @@
 
     const getContinent = (c)=> countryToContinent[c] || 'OTHER';
 
-    // ---------- Continuous green↔gray↔red color (Finviz-ish) ----------
+    // ---------- Finviz 정확한 색상 팔레트 ----------
     function colorFromChange(change){
-      // Clamp at [-5%, +5%] for color intensity
-      const c = Math.max(-5, Math.min(5, change));
-      // Map -5→0 (red), 0→60 (neutral gray), +5→120 (green) using HSL
-      const hue = c >= 0 ? 60 + (c/5)*60 : 60 + (c/5)*60; // around 60 is grayish
-      const sat = 80; const light = 45; // strong colors
-      // For near zero, use neutral tile gray
-      if (Math.abs(change) < 0.4) return '#3D444C';
-      return `hsl(${120*(c+5)/10}, ${sat}%, ${light}%)`;
+      // 중립 (0% 근처, -0.5% ~ +0.5%)
+      if (Math.abs(change) < 0.5) {
+        return '#3D444C';
+      }
+      
+      // 상승 그라데이션
+      if (change > 0) {
+        if (change >= 3) {
+          return '#00FF00'; // 급등 (≥+3%)
+        } else if (change >= 2) {
+          return '#00E676'; // 큰 상승 (+2~3%)
+        } else if (change >= 1) {
+          return '#00C853'; // 보통 상승 (+1~2%)
+        } else {
+          return '#39D353'; // 약한 상승 (+0~1%)
+        }
+      }
+      
+      // 하락 그라데이션
+      if (change <= -3) {
+        return '#FF0000'; // 급락 (≤-3%)
+      } else if (change <= -2) {
+        return '#FF1A1A'; // 큰 하락 (-2~-3%)
+      } else if (change <= -1) {
+        return '#FF3B3B'; // 보통 하락 (-1~-2%)
+      } else {
+        return '#FF6E6E'; // 약한 하락 (-0~-1%)
+      }
     }
 
     // ---------- Sample data ----------
@@ -215,9 +235,10 @@
               const change=g.chg[i];
               const share=revenue/total; // area fraction approx
               const col=colorFromChange(change);
-              // 변화량에 따른 글씨 크기 (절대값 기준, 최소 12px, 최대 24px)
+              // Finviz 스타일: 변화량에 따른 글씨 크기 (절대값 기준)
               const changeIntensity = Math.abs(change) / Math.max(maxAbsChange, 1);
-              const fontSize = Math.max(12, Math.min(24, 12 + changeIntensity * 12));
+              // Finviz는 변화가 클수록 더 큰 글씨 (최소 11px, 최대 16px)
+              const fontSize = Math.max(11, Math.min(16, 11 + changeIntensity * 5));
               ids.push(`country:${cont}:${country}`);
               labels.push(country);
               parents.push(contId);
@@ -225,11 +246,11 @@
               colors.push(col);
               let t='';
               if(share>=medium){
-                t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.7}px;display:block;text-align:center">${(revenue/1000).toFixed(0)}K</span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${change>=0?'+':''}${change.toFixed(1)}%</span>`;
+                t = `<div style="text-align:center;line-height:1.2"><span style="font-size:${fontSize}px;font-weight:600;color:#FFFFFF;display:block">${country}</span><span style="font-size:${Math.max(9,fontSize*0.65)}px;color:#FFFFFF;display:block;opacity:0.9">${(revenue/1000).toFixed(0)}K</span><span style="font-size:${Math.max(9,fontSize*0.7)}px;font-weight:600;color:#FFFFFF;display:block">${change>=0?'+':''}${change.toFixed(1)}%</span></div>`;
               }else if(share>=small){
-                t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${change>=0?'+':''}${change.toFixed(1)}%</span>`;
+                t = `<div style="text-align:center;line-height:1.2"><span style="font-size:${fontSize}px;font-weight:600;color:#FFFFFF;display:block">${country}</span><span style="font-size:${Math.max(9,fontSize*0.7)}px;font-weight:600;color:#FFFFFF;display:block">${change>=0?'+':''}${change.toFixed(1)}%</span></div>`;
               }else{
-                t = compact ? '' : `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span>`;
+                t = compact ? '' : `<div style="text-align:center"><span style="font-size:${fontSize}px;font-weight:600;color:#FFFFFF">${country}</span></div>`;
               }
               text.push(t);
               custom.push([change, revenue, cont]);
@@ -241,14 +262,15 @@
           const maxAbsChange = Math.max(...stats.topChange.map(c => Math.abs(c)));
           stats.topCountries.forEach((country,i)=>{
             const rev=stats.topRevenue[i]; const ch=stats.topChange[i]; const share=rev/total; const cont=getContinent(country);
-            // 변화량에 따른 글씨 크기 (절대값 기준, 최소 12px, 최대 24px)
+            // Finviz 스타일: 변화량에 따른 글씨 크기 (절대값 기준)
             const changeIntensity = Math.abs(ch) / Math.max(maxAbsChange, 1);
-            const fontSize = Math.max(12, Math.min(24, 12 + changeIntensity * 12));
+            // Finviz는 변화가 클수록 더 큰 글씨 (최소 11px, 최대 16px)
+            const fontSize = Math.max(11, Math.min(16, 11 + changeIntensity * 5));
             ids.push(`country::${country}`); labels.push(country); parents.push(''); values.push(rev); colors.push(colorFromChange(ch));
             let t='';
-            if(share>=medium) t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.7}px;display:block;text-align:center">${(rev/1000).toFixed(0)}K</span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${ch>=0?'+':''}${ch.toFixed(1)}%</span>`;
-            else if(share>=small) t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${ch>=0?'+':''}${ch.toFixed(1)}%</span>`;
-            else t = compact ? '' : `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span>`;
+            if(share>=medium) t = `<div style="text-align:center;line-height:1.2"><span style="font-size:${fontSize}px;font-weight:600;color:#FFFFFF;display:block">${country}</span><span style="font-size:${Math.max(9,fontSize*0.65)}px;color:#FFFFFF;display:block;opacity:0.9">${(rev/1000).toFixed(0)}K</span><span style="font-size:${Math.max(9,fontSize*0.7)}px;font-weight:600;color:#FFFFFF;display:block">${ch>=0?'+':''}${ch.toFixed(1)}%</span></div>`;
+            else if(share>=small) t = `<div style="text-align:center;line-height:1.2"><span style="font-size:${fontSize}px;font-weight:600;color:#FFFFFF;display:block">${country}</span><span style="font-size:${Math.max(9,fontSize*0.7)}px;font-weight:600;color:#FFFFFF;display:block">${ch>=0?'+':''}${ch.toFixed(1)}%</span></div>`;
+            else t = compact ? '' : `<div style="text-align:center"><span style="font-size:${fontSize}px;font-weight:600;color:#FFFFFF">${country}</span></div>`;
             text.push(t);
             custom.push([ch, rev, cont]);
           });
@@ -267,14 +289,14 @@
                         'Change: %{customdata[0]:.2f}%<br>Sector: %{customdata[2]}<extra></extra>',
           customdata: custom,
           pathbar:{visible:false},
-          textfont:{family:'Arial, Helvetica, sans-serif', color:'#ffffff', size:12}
+          textfont:{family:'Arial, Helvetica, sans-serif', color:'#FFFFFF', size:12}
         };
 
         const layout={
           paper_bgcolor: getComputedStyle(document.documentElement).getPropertyValue('--tile-gap').trim() || '#2B2F3A',
           plot_bgcolor: getComputedStyle(document.documentElement).getPropertyValue('--tile-gap').trim() || '#2B2F3A',
           margin:{l:0,r:0,t:0,b:0}, height,
-          font:{family:'Arial, Helvetica, sans-serif',size:11,color:'#ffffff'},
+          font:{family:'Arial, Helvetica, sans-serif',size:11,color:'#FFFFFF'},
           uniformtext:{minsize:10,mode:'hide'},
           hoverlabel:{bgcolor:'#161b22',bordercolor:'#30363d',font:{color:'#fff'}}
         };
