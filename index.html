@@ -297,13 +297,20 @@
         
         .badge {
             display: inline-block;
-            padding: 0.25rem 0.5rem;
+            padding: 0.35rem 0.7rem;
             border: 1px solid #30363d;
             border-radius: 999px;
             font: 11px/1.2 system-ui, -apple-system, sans-serif;
             background: #161b22;
-            color: #8b949e;
-            margin-left: 8px;
+            color: #ffffff;
+            margin-left: 12px;
+            transition: all 0.2s;
+        }
+        
+        .badge:hover {
+            background: #238636;
+            border-color: #2ea043;
+            color: #ffffff;
         }
         
         .badge[data-tip] {
@@ -719,7 +726,7 @@
                         
                         // Add continent label (parent) - Finviz style: Sector name at top
                         // Format continent label with styling (Sector = Continent)
-                        const continentLabel = `<b style="font-size:24px;color:#ffffff;font-weight:bold;text-transform:uppercase">${continent}</b><br><span style="font-size:12px;color:#8b949e">SECTOR</span>`;
+                        const continentLabel = `<b style="font-size:28px;color:#ffffff;font-weight:bold;text-transform:uppercase;letter-spacing:1px">${continent}</b><br><span style="font-size:14px;color:#238636;font-weight:bold;background:#0d1117;padding:2px 6px;border-radius:4px;display:inline-block;margin-top:4px">SECTOR</span>`;
                         labels.push(continentLabel);
                         parents.push(''); // Empty string means root level
                         values.push(continentTotal);
@@ -762,7 +769,7 @@
                             const changeColor = change >= 0 ? '#00ff00' : '#ff0000';
                             
                             // Create country label with HTML formatting (Industry = Country)
-                            const countryLabel = `<b style="font-size:${countrySize}px;color:#ffffff;font-weight:bold">${country}</b><br><span style="font-size:10px;color:#6b7280">INDUSTRY</span><br><span style="font-size:${trafficSize}px;color:#8b949e">${(data.revenues[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${changeColor}">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</span>`;
+                            const countryLabel = `<b style="font-size:${countrySize}px;color:#ffffff;font-weight:bold">${country}</b><br><span style="font-size:11px;color:#238636;font-weight:bold;background:#0d1117;padding:1px 4px;border-radius:3px;display:inline-block">INDUSTRY</span><br><span style="font-size:${trafficSize}px;color:#8b949e">${(data.revenues[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${changeColor}">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</span>`;
                             labels.push(countryLabel);
                             parents.push(continent); // Parent is the continent name (Sector)
                             values.push(data.revenues[i]);
