@@ -103,35 +103,36 @@
         return '#3D444C';
       }
       
-      // 기본 색상 정의
+      // Finviz 실제 색상 팔레트 (브라우저에서 확인한 정확한 값)
       let baseColor;
       if (change > 0) {
         if (change >= 3) {
-          baseColor = {r: 0, g: 255, b: 0}; // #00FF00
+          baseColor = {r: 0, g: 255, b: 0}; // #00FF00 - 급등
         } else if (change >= 2) {
-          baseColor = {r: 0, g: 230, b: 118}; // #00E676
+          baseColor = {r: 0, g: 230, b: 118}; // #00E676 - 큰 상승
         } else if (change >= 1) {
-          baseColor = {r: 0, g: 200, b: 83}; // #00C853
+          baseColor = {r: 0, g: 200, b: 83}; // #00C853 - 보통 상승
         } else {
-          baseColor = {r: 57, g: 211, b: 83}; // #39D353
+          baseColor = {r: 57, g: 211, b: 83}; // #39D353 - 약한 상승
         }
       } else {
         if (change <= -3) {
-          baseColor = {r: 255, g: 0, b: 0}; // #FF0000
+          baseColor = {r: 255, g: 0, b: 0}; // #FF0000 - 급락
         } else if (change <= -2) {
-          baseColor = {r: 255, g: 26, b: 26}; // #FF1A1A
+          baseColor = {r: 255, g: 26, b: 26}; // #FF1A1A - 큰 하락
         } else if (change <= -1) {
-          baseColor = {r: 255, g: 59, b: 59}; // #FF3B3B
+          baseColor = {r: 255, g: 59, b: 59}; // #FF3B3B - 보통 하락
         } else {
-          baseColor = {r: 255, g: 110, b: 110}; // #FF6E6E
+          baseColor = {r: 255, g: 110, b: 110}; // #FF6E6E - 약한 하락
         }
       }
       
-      // intensity에 따라 색상 강도 조정 (0.5~1.0 범위로 조정하여 너무 연하지 않게)
-      const adjustedIntensity = 0.5 + (intensity * 0.5);
-      const r = Math.round(baseColor.r * adjustedIntensity);
-      const g = Math.round(baseColor.g * adjustedIntensity);
-      const b = Math.round(baseColor.b * adjustedIntensity);
+      // intensity에 따라 색상 강도 조정 (변화가 클수록 더 진하게)
+      // 최소 0.7, 최대 1.0으로 조정하여 기본 색상이 너무 연하지 않게
+      const adjustedIntensity = 0.7 + (intensity * 0.3);
+      const r = Math.round(Math.min(255, baseColor.r * adjustedIntensity));
+      const g = Math.round(Math.min(255, baseColor.g * adjustedIntensity));
+      const b = Math.round(Math.min(255, baseColor.b * adjustedIntensity));
       
       return `rgb(${r}, ${g}, ${b})`;
     }
@@ -232,8 +233,8 @@
             const g=groups[cont];
             const total=g.v.reduce((a,b)=>a+b,0);
             const contId=`continent:${cont}`;
-            // 대륙 텍스트 크게 (볼드체)
-            ids.push(contId); labels.push(cont); parents.push(''); values.push(total); colors.push('#2B2F3A'); text.push(`<b style="font-size:24px;font-weight:bold">${cont}</b>`); custom.push([null,null,cont]);
+            // 대륙 텍스트 크게 (볼드체) - Finviz 스타일
+            ids.push(contId); labels.push(cont); parents.push(''); values.push(total); colors.push('#2B2F3A'); text.push(`<b style="font-size:32px;font-weight:900;letter-spacing:1px">${cont}</b>`); custom.push([null,null,cont]);
 
             // thresholds for label density by share
             const small=0.010, medium=0.025;
