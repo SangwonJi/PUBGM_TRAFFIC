@@ -673,20 +673,22 @@
                         const continentAvgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
                         
                         // Add continent label (parent) - Only continent name, no stats
-                        labels.push(`<b style="font-size:20px;color:#ffffff;font-weight:bold">${continent}</b>`);
-                        parents.push('');
+                        // Use continent name as the label for parent node
+                        labels.push(continent);
+                        parents.push(''); // Empty string means root level
                         values.push(continentTotal);
                         
                         // Continent color - distinct colors for each continent for better visibility
+                        // Use darker, more distinct colors for continent grouping
                         const continentColors = {
-                            'ASIA': 'rgb(100, 100, 150)',
-                            'EUROPE': 'rgb(150, 100, 100)',
-                            'NORTH AMERICA': 'rgb(100, 150, 100)',
-                            'SOUTH AMERICA': 'rgb(150, 150, 100)',
-                            'AFRICA': 'rgb(150, 100, 150)',
-                            'OCEANIA': 'rgb(100, 150, 150)',
-                            'RUSSIA & CIS': 'rgb(120, 120, 120)',
-                            'OTHER': 'rgb(80, 80, 80)'
+                            'ASIA': 'rgb(80, 80, 120)',
+                            'EUROPE': 'rgb(120, 80, 80)',
+                            'NORTH AMERICA': 'rgb(80, 120, 80)',
+                            'SOUTH AMERICA': 'rgb(120, 120, 80)',
+                            'AFRICA': 'rgb(120, 80, 120)',
+                            'OCEANIA': 'rgb(80, 120, 120)',
+                            'RUSSIA & CIS': 'rgb(100, 100, 100)',
+                            'OTHER': 'rgb(60, 60, 60)'
                         };
                         colors.push(continentColors[continent] || 'rgb(60, 60, 60)');
                         
@@ -713,8 +715,10 @@
                             // Finviz style colors: bright green/red
                             const changeColor = change >= 0 ? '#00ff00' : '#ff0000';
                             
-                            labels.push(`<b style="font-size:${countrySize}px;color:#ffffff;font-weight:bold">${country}</b><br><span style="font-size:${trafficSize}px;color:#8b949e">${(data.revenues[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${changeColor}">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</span>`);
-                            parents.push(continent);
+                            // Create country label with HTML formatting
+                            const countryLabel = `<b style="font-size:${countrySize}px;color:#ffffff;font-weight:bold">${country}</b><br><span style="font-size:${trafficSize}px;color:#8b949e">${(data.revenues[i] / 1000).toFixed(0)}K</span><br><span style="font-size:${changeSize}px;font-weight:bold;color:${changeColor}">${change >= 0 ? '+' : ''}${change.toFixed(1)}%</span>`;
+                            labels.push(countryLabel);
+                            parents.push(continent); // Parent is the continent name
                             values.push(data.revenues[i]);
                             
                             // Country color based on change - Finviz bright colors
@@ -767,32 +771,45 @@
                     });
                 }
             
-                const trace = {
-                    type: 'treemap',
-                    labels: labels,
-                    parents: parents,
+                // Ensure all arrays have the same length
+                if (labels.length !== parents.length || labels.length !== values.length || labels.length !== colors.length) {
+                    console.error('Array length mismatch:', {
+                        labels: labels.length,
+                        parents: parents.length,
+                        values: values.length,
+                        colors: colors.length
+                    });
+                }
+            
+            const trace = {
+                type: 'treemap',
+                labels: labels,
+                parents: parents,
                     values: values,
-                    marker: {
-                        colors: colors,
+                marker: {
+                    colors: colors,
                         line: { 
-                            width: groupByContinent ? 5 : 2, // Thicker border for continent grouping
+                            width: groupByContinent ? 6 : 2, // Thicker border for continent grouping
                             color: groupByContinent ? '#ffffff' : '#0d1117' // White border to separate continents
                         },
                         pad: { 
-                            b: groupByContinent ? 15 : 6, // More padding between continent groups
-                            l: groupByContinent ? 15 : 6,
-                            r: groupByContinent ? 15 : 6,
-                            t: groupByContinent ? 15 : 6
-                        }
-                    },
-                    textinfo: 'label',
-                    textfont: { 
+                            b: groupByContinent ? 20 : 6, // More padding between continent groups
+                            l: groupByContinent ? 20 : 6,
+                            r: groupByContinent ? 20 : 6,
+                            t: groupByContinent ? 20 : 6
+                        },
+                        depthfade: false
+                },
+                textinfo: 'label',
+                textfont: { 
                         family: 'Arial, Helvetica, sans-serif',
-                        color: '#ffffff'
+                        color: '#ffffff',
+                        size: 12
                     },
                     hovertemplate: '<b>%{label}</b><br>Traffic: %{value:,.0f}<extra></extra>',
                     textposition: 'middle center',
-                    branchvalues: 'total'
+                    branchvalues: 'total',
+                    maxdepth: groupByContinent ? 2 : 1 // Allow 2 levels: continents and countries
                 };
                 
                 // Debug: Log treemap data structure
@@ -818,6 +835,10 @@
                     family: 'Arial, Helvetica, sans-serif',
                     size: 11,
                         color: '#ffffff'
+                    },
+                    uniformtext: {
+                        minsize: 8,
+                        mode: 'hide'
                     }
                 };
             
