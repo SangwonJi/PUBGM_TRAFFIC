@@ -170,7 +170,7 @@
         #treemap {
             width: 100%;
       min-height: 900px;
-      background: #0d1117;
+      background: #2B2F3A;
       border: 2px solid #30363d;
       border-radius: 8px;
       position: relative;
@@ -517,6 +517,38 @@
     
     const getContinent = (c) => countryToContinent[c] || 'OTHER';
 
+    // -------- Finviz 스타일 색상 계산 함수 --------
+    function getFinvizColor(change) {
+      // 중립 (0% 근처, -0.5% ~ +0.5%)
+      if (Math.abs(change) < 0.5) {
+        return '#3D444C';
+      }
+      
+      // 상승 그라데이션
+      if (change > 0) {
+        if (change >= 3) {
+          return '#00FF00'; // 급등 (≥+3%)
+        } else if (change >= 2) {
+          return '#00E676'; // 큰 상승 (+2~3%)
+        } else if (change >= 1) {
+          return '#00C853'; // 보통 상승 (+1~2%)
+        } else {
+          return '#39D353'; // 약한 상승 (+0~1%)
+        }
+      }
+      
+      // 하락 그라데이션
+      if (change <= -3) {
+        return '#FF0000'; // 급락 (≤-3%)
+      } else if (change <= -2) {
+        return '#FF1A1A'; // 큰 하락 (-2~-3%)
+      } else if (change <= -1) {
+        return '#FF3B3B'; // 보통 하락 (-1~-2%)
+      } else {
+        return '#FF6E6E'; // 약한 하락 (-0~-1%)
+      }
+    }
+
     // -------- 샘플 데이터 생성 (250개 국가) --------
     function generateSampleData(){
       const countries = [], day1 = [], day2 = [], day3 = [];
@@ -677,10 +709,8 @@
                     <div class="stat-label">Max Decrease</div>
                     <div class="stat-value negative">${stats.minChange.toFixed(2)}%</div>
                 </div>
-            `;
-            
-            const absMaxChange = Math.max(Math.abs(stats.maxChange), Math.abs(stats.minChange));
-            
+        `;
+
         // 트리 데이터 컨테이너
         let ids = [], labels = [], parents = [], values = [], colors = [], text = [], customdata = [];
         if(groupByContinent){
@@ -711,7 +741,7 @@
             labels.push(cont);
             parents.push('');
             values.push(total);
-            colors.push(continentColors[cont] || continentColors['OTHER']);
+            colors.push('#FFFFFF'); // 섹터 경계선을 흰색으로
             text.push('SECTOR');
             customdata.push([avgCh, null, cont]);
 
@@ -719,8 +749,7 @@
             dataC.countries.forEach((country, i) => {
               const revenue = dataC.revenues[i];
               const change = dataC.changes[i];
-                    const intensity = Math.min(Math.abs(change) / absMaxChange, 1);
-              const color = change >= 0 ? `rgb(0, ${Math.round(255 * intensity)}, 0)` : `rgb(${Math.round(255 * intensity)}, 0, 0)`;
+              const color = getFinvizColor(change);
 
               ids.push(`country:${cont}:${country}`);
               labels.push(country);
@@ -736,8 +765,7 @@
           stats.topCountries.forEach((country, i) => {
             const rev = stats.topRevenue[i];
             const ch = stats.topChange[i];
-            const intensity = Math.min(Math.abs(ch) / absMaxChange, 1);
-            const color = ch >= 0 ? `rgb(0, ${Math.round(255 * intensity)}, 0)` : `rgb(${Math.round(255 * intensity)}, 0, 0)`;
+            const color = getFinvizColor(ch);
 
             ids.push(`country::${country}`);
             labels.push(country);
@@ -762,11 +790,11 @@
                 marker: {
             colors,
             line: {
-              width: groupByContinent ? 6 : 2,
-              color: groupByContinent ? '#ffffff' : '#0d1117'
+              width: 1,
+              color: '#1E232C' // 개별 타일 경계선
             }
           },
-          tiling: { pad: groupByContinent ? 10 : 4 },
+          tiling: { pad: groupByContinent ? 12 : 4 }, // 섹터 경계선 여백
           text, textinfo: 'label+text',
           textfont: {family: 'Arial, Helvetica, sans-serif', size: 12, color: '#ffffff'},
           branchvalues: 'total',
@@ -781,8 +809,8 @@
             };
             
             const layout = {
-          paper_bgcolor: '#0d1117',
-          plot_bgcolor: '#0d1117',
+          paper_bgcolor: '#2B2F3A',
+          plot_bgcolor: '#2B2F3A',
           margin: {l: 0, r: 0, t: 0, b: 0},
           height: treemapHeight,
           font: {family: 'Arial, Helvetica, sans-serif', size: 11, color: '#ffffff'},
