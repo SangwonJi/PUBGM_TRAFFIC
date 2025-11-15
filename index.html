@@ -3,390 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Traffic by Country - Heatmap Visualization</title>
+  <title>Traffic by Country — Finviz-style Treemap</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-      font-size: 14px;
-      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
-      color: #ffffff;
-            min-height: 100vh;
-      line-height: 1.6;
-        }
-        
-        .container {
-            max-width: 1920px;
-            margin: 0 auto;
-      background: #0d1117;
-      box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
-        }
-        
-        .header {
-      background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
-      border-bottom: 2px solid #30363d;
-      padding: 20px 24px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        }
-        
-        .header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #ffffff;
-      margin: 0 0 8px 0;
-      letter-spacing: -0.5px;
-        }
-        
-        .header p {
-      font-size: 13px;
-            color: #8b949e;
-      margin-top: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-        }
-        
-        .toolbar {
-      padding: 16px 24px;
-      background: #161b22;
-      border-bottom: 1px solid #30363d;
-            display: flex;
-      gap: 12px;
-            align-items: center;
-      flex-wrap: wrap;
-        }
-        
-        .toolbar input[type="file"] {
-      padding: 8px 12px;
-      border: 1px solid #30363d;
-      background: #0d1117;
-      color: #ffffff;
-            cursor: pointer;
-      font-size: 13px;
-      border-radius: 6px;
-      transition: all 0.2s ease;
+    :root{
+      --bg:#0d1117; --panel:#161b22; --muted:#8b949e; --border:#30363d; --tile-gap:#2B2F3A; /* Finviz-ish gap */
+      --green-weak:#39D353; --green-mid:#00C853; --green-strong:#00E676; --green-max:#00FF00;
+      --red-weak:#FF6E6E; --red-mid:#FF3B3B; --red-strong:#FF1A1A; --red-max:#FF0000;
     }
-    
-    .toolbar input[type="file"]:hover {
-      border-color: #238636;
-      background: #161b22;
-        }
-        
-        .toolbar button {
-      padding: 8px 16px;
-      background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
-            color: #ffffff;
-            border: none;
-            cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 4px rgba(35, 134, 54, 0.3);
-        }
-        
-        .toolbar button:hover {
-      background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(35, 134, 54, 0.4);
-    }
-    
-    .toolbar button:active {
-      transform: translateY(0);
-        }
-        
-        .status-badge {
-      background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
-            color: #ffffff;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      border-radius: 6px;
-      box-shadow: 0 2px 4px rgba(35, 134, 54, 0.3);
-        }
-        
-        .content {
-      padding: 24px;
-      background: #0d1117;
-        }
-        
-        .stats-grid {
-            display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-        }
-        
-        .stat-item {
-      background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
-      padding: 20px;
-      border: 1px solid #30363d;
-      border-radius: 8px;
-            text-align: left;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-    
-    .stat-item:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-      border-color: #30363d;
-        }
-        
-        .stat-label {
-      font-size: 11px;
-            color: #8b949e;
-      margin-bottom: 8px;
-            text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-        }
-        
-        .stat-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: #ffffff;
-            line-height: 1.2;
-      letter-spacing: -0.5px;
-        }
-        
-        .stat-value.positive {
-      color: #00ff00;
-      text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-        }
-        
-        .stat-value.negative {
-      color: #ff0000;
-      text-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
-        }
-        
-        #treemap {
-            width: 100%;
-      min-height: 900px;
-      background: #2B2F3A;
-      border: 2px solid #30363d;
-      border-radius: 8px;
-      position: relative;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      overflow: hidden;
-    }
-    
-    .loading-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(13, 17, 23, 0.95);
-      backdrop-filter: blur(4px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      color: #d4d4d4;
-    }
-    
-    .loading-spinner {
-      border: 4px solid #30363d;
-      border-top: 4px solid #238636;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-    
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    .loading-text {
-      font-size: 14px;
-      color: #8b949e;
-      font-weight: 500;
-    }
-    
-    .filter-controls {
-      padding: 16px 24px;
-      background: #161b22;
-      border-bottom: 1px solid #30363d;
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    
-    .filter-controls label {
-      font-size: 13px;
-      color: #c9d1d9;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .filter-controls input[type="number"] {
-      padding: 8px 12px;
-      border: 1px solid #30363d;
-      background: #0d1117;
-      color: #ffffff;
-      font-size: 13px;
-      width: 100px;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-    }
-    
-    .filter-controls input[type="number"]:focus {
-      outline: none;
-      border-color: #238636;
-      box-shadow: 0 0 0 3px rgba(35, 134, 54, 0.1);
-    }
-    
-    .filter-controls select {
-      padding: 8px 12px;
-      border: 1px solid #30363d;
-      background: #0d1117;
-      color: #ffffff;
-      font-size: 13px;
-      cursor: pointer;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-    }
-    
-    .filter-controls select:focus {
-      outline: none;
-      border-color: #238636;
-      box-shadow: 0 0 0 3px rgba(35, 134, 54, 0.1);
-    }
-    
-    .filter-controls input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-      accent-color: #238636;
-        }
-        
-        .footer {
-      padding: 16px 24px;
-      border-top: 1px solid #30363d;
-      background: #161b22;
-      font-size: 12px;
-            color: #8b949e;
-            text-align: center;
-        }
-    
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 6px 12px;
-      border: 1px solid #30363d;
-      border-radius: 20px;
-      font: 12px/1.2 system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
-      color: #ffffff;
-      margin-left: 12px;
-      transition: all 0.3s ease;
-      cursor: help;
-      font-weight: 500;
-    }
-    
-    .badge:hover {
-      background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
-      border-color: #2ea043;
-      color: #ffffff;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 8px rgba(35, 134, 54, 0.3);
-    }
-    
-    .badge[data-tip] {
-      position: relative;
-    }
-    
-    .badge[data-tip]:hover::after {
-      content: attr(data-tip);
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: calc(100% + 12px);
-      white-space: nowrap;
-      background: #161b22;
-      color: #ffffff;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-      z-index: 1000;
-      pointer-events: none;
-      border: 1px solid #30363d;
-    }
-    
-    .badge[data-tip]:hover::before {
-      content: '';
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: calc(100% + 4px);
-      width: 0;
-      height: 0;
-      border-left: 6px solid transparent;
-      border-right: 6px solid transparent;
-      border-top: 6px solid #161b22;
-      z-index: 1001;
-    }
-    
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-      width: 10px;
-      height: 10px;
-    }
-    
-    ::-webkit-scrollbar-track {
-      background: #0d1117;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-      background: #30363d;
-      border-radius: 5px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-      background: #484f58;
-    }
-    
-    /* Responsive design */
-    @media (max-width: 768px) {
-      .header {
-        padding: 16px;
-      }
-      
-      .header h1 {
-        font-size: 20px;
-      }
-      
-      .toolbar,
-      .filter-controls {
-        padding: 12px 16px;
-      }
-      
-      .content {
-        padding: 16px;
-      }
-      
-      .stats-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-      }
-      
-      .stat-value {
-        font-size: 24px;
-      }
-    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,var(--bg),#161b22);color:#fff;min-height:100vh}
+    .container{max-width:1920px;margin:0 auto;background:var(--bg)}
+    .header{background:linear-gradient(135deg,#161b22,#1c2128);border-bottom:1px solid var(--border);padding:18px 22px}
+    .header h1{font-size:20px;font-weight:700;letter-spacing:-.2px}
+    .header p{font-size:12px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:8px}
+    .toolbar,.filter-controls{padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .toolbar input[type="file"], .filter-controls input[type="number"], .filter-controls select{padding:8px 12px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px}
+    .toolbar button{padding:8px 14px;background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer}
+    .status-badge{background:linear-gradient(135deg,#238636,#2ea043);padding:6px 10px;border-radius:6px;font-size:12px}
+    .content{padding:18px}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+    .stat-item{background:linear-gradient(135deg,#161b22,#1c2128);border:1px solid var(--border);border-radius:8px;padding:14px}
+    .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+    .stat-value{font-size:22px;font-weight:700}
+    .stat-value.positive{color:#00ff00}
+    .stat-value.negative{color:#ff4d4d}
+    #treemap{width:100%;min-height:900px;background:var(--tile-gap);border:1px solid var(--border);border-radius:8px;position:relative;overflow:hidden}
+    .loading-overlay{position:absolute;inset:0;background:rgba(13,17,23,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000}
+    .loading-spinner{border:4px solid var(--border);border-top:4px solid #238636;border-radius:50%;width:46px;height:46px;animation:spin 1s linear infinite;margin-bottom:12px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .badge{display:inline-flex;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:linear-gradient(135deg,#161b22,#1c2128);font-size:12px}
+    .badge[data-tip]{position:relative}
+    .badge[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 10px);white-space:nowrap;background:#161b22;color:#fff;padding:8px 10px;border-radius:8px;border:1px solid var(--border)}
+    @media (max-width:768px){.header{padding:14px}.content{padding:12px}}
     </style>
 </head>
 <body>
@@ -394,33 +44,27 @@
         <div class="header">
       <h1>🌍 Traffic by Country</h1>
       <p id="headerSubtitle">
-        <span id="subtitleText">250 Countries - 3-Day Traffic Analysis</span>
+        <span id="subtitleText">250 Countries — 3-Day Traffic Analysis</span>
         <span class="badge" data-tip="Sector=대륙(Continent), Industry=국가(Country)">Sector / Industry란?</span>
       </p>
         </div>
         
         <div class="toolbar">
       <input type="file" id="csvFile" accept=".csv"/>
-      <button onclick="loadCSV()">📁 Load CSV</button>
+      <button id="btnLoad">📁 Load CSV</button>
       <div class="status-badge" id="status">Sample Data (250 Countries)</div>
     </div>
 
     <div class="filter-controls">
-      <label>
-        <strong>Show Top:</strong>
-        <input type="number" id="topCount" value="250" min="1" max="250" onchange="updateDisplay()"/>
-      </label>
-      <label>
-        <strong>Sort By:</strong>
-        <select id="sortBy" onchange="updateDisplay()">
-          <option value="revenue">Total Traffic</option>
+      <label><strong>Show Top:</strong> <input type="number" id="topCount" value="180" min="10" max="250"/></label>
+      <label><strong>Sort By:</strong>
+        <select id="sortBy">
+          <option value="revenue" selected>Total Traffic</option>
           <option value="change">Change %</option>
         </select>
       </label>
-      <label style="margin-left: 12px;">
-        <input type="checkbox" id="groupByContinent" checked onchange="updateDisplay()"/>
-        <strong>Group by Sector (Continent)</strong>
-      </label>
+      <label><input type="checkbox" id="groupByContinent" checked/> <strong>Group by Sector (Continent)</strong></label>
+      <label><input type="checkbox" id="compactLabels" checked/> <strong>Compact labels</strong></label>
         </div>
         
         <div class="content">
@@ -428,412 +72,222 @@
       <div id="treemap">
         <div class="loading-overlay" id="loadingOverlay">
           <div class="loading-spinner"></div>
-          <div class="loading-text">데이터를 생성하고 있습니다...</div>
+          <div class="loading-text" style="color:var(--muted)">데이터를 생성하고 있습니다...</div>
         </div>
       </div>
-    </div>
-
-    <div class="footer">
-      📊 CSV Format: Country,Day1,Day2,Day3 | Hover over countries for detailed information
+        </div>
+        
+    <div class="footer" style="padding:14px;background:var(--panel);border-top:1px solid var(--border);color:var(--muted);text-align:center;font-size:12px">
+      📊 CSV Format: Country,Day1,Day2,Day3 · Hover tiles for details
         </div>
     </div>
 
     <script>
-    // -------- Country → Continent (Sector) 매핑 --------
+    // ---------- Mapping: Country → Continent (Sector) ----------
     const countryToContinent = {
-      // North America
-      'USA':'NORTH AMERICA','Canada':'NORTH AMERICA','Mexico':'NORTH AMERICA',
-      'Guatemala':'NORTH AMERICA','Honduras':'NORTH AMERICA','El Salvador':'NORTH AMERICA',
-      'Nicaragua':'NORTH AMERICA','Costa Rica':'NORTH AMERICA','Panama':'NORTH AMERICA',
-      'Cuba':'NORTH AMERICA','Jamaica':'NORTH AMERICA','Haiti':'NORTH AMERICA',
-      'Dominican Republic':'NORTH AMERICA','Trinidad':'NORTH AMERICA','Barbados':'NORTH AMERICA',
-      'Bahamas':'NORTH AMERICA','Belize':'NORTH AMERICA',
-      // South America
-      'Brazil':'SOUTH AMERICA','Argentina':'SOUTH AMERICA','Chile':'SOUTH AMERICA',
-      'Colombia':'SOUTH AMERICA','Peru':'SOUTH AMERICA','Ecuador':'SOUTH AMERICA',
-      'Venezuela':'SOUTH AMERICA','Uruguay':'SOUTH AMERICA','Paraguay':'SOUTH AMERICA',
-      'Bolivia':'SOUTH AMERICA','Suriname':'SOUTH AMERICA','Guyana':'SOUTH AMERICA',
-      'French Guiana':'SOUTH AMERICA',
-      // Europe
-      'Germany':'EUROPE','UK':'EUROPE','France':'EUROPE','Italy':'EUROPE',
-      'Spain':'EUROPE','Netherlands':'EUROPE','Poland':'EUROPE','Belgium':'EUROPE',
-      'Sweden':'EUROPE','Switzerland':'EUROPE','Greece':'EUROPE','Portugal':'EUROPE',
-      'Czech Republic':'EUROPE','Romania':'EUROPE','Hungary':'EUROPE','Bulgaria':'EUROPE',
-      'Croatia':'EUROPE','Serbia':'EUROPE','Slovakia':'EUROPE','Slovenia':'EUROPE',
-      'Austria':'EUROPE','Denmark':'EUROPE','Norway':'EUROPE','Finland':'EUROPE',
-      'Ireland':'EUROPE','Cyprus':'EUROPE','Albania':'EUROPE','Bosnia':'EUROPE',
-      'Macedonia':'EUROPE','Montenegro':'EUROPE','Kosovo':'EUROPE','Iceland':'EUROPE',
-      'Luxembourg':'EUROPE','Malta':'EUROPE','Monaco':'EUROPE','Andorra':'EUROPE',
-      'Liechtenstein':'EUROPE','San Marino':'EUROPE','Vatican':'EUROPE',
-      'Jersey':'EUROPE','Guernsey':'EUROPE','Isle of Man':'EUROPE',
-      'Faroe Islands':'EUROPE','Greenland':'EUROPE','Svalbard':'EUROPE',
-      'Ukraine':'EUROPE','Lithuania':'EUROPE','Latvia':'EUROPE','Estonia':'EUROPE',
-      'Moldova':'EUROPE','Belarus':'EUROPE',
-      // Asia
-      'China':'ASIA','India':'ASIA','Japan':'ASIA','Korea':'ASIA','South Korea':'ASIA',
-      'Indonesia':'ASIA','Thailand':'ASIA','Vietnam':'ASIA','Philippines':'ASIA',
-      'Malaysia':'ASIA','Singapore':'ASIA','Pakistan':'ASIA','Bangladesh':'ASIA',
-      'Myanmar':'ASIA','Cambodia':'ASIA','Laos':'ASIA','Nepal':'ASIA',
-      'Sri Lanka':'ASIA','Afghanistan':'ASIA','Iraq':'ASIA','Iran':'ASIA',
-      'Israel':'ASIA','Jordan':'ASIA','Lebanon':'ASIA','Kuwait':'ASIA',
-      'Qatar':'ASIA','Oman':'ASIA','Bahrain':'ASIA','Yemen':'ASIA',
-      'Syria':'ASIA','Saudi Arabia':'ASIA','UAE':'ASIA','Turkey':'ASIA',
-      'Kazakhstan':'ASIA','Uzbekistan':'ASIA','Kyrgyzstan':'ASIA','Tajikistan':'ASIA',
-      'Turkmenistan':'ASIA','Azerbaijan':'ASIA','Armenia':'ASIA','Georgia':'ASIA',
-      'Mongolia':'ASIA','North Korea':'ASIA','Taiwan':'ASIA','Hong Kong':'ASIA',
-      'Macau':'ASIA','Brunei':'ASIA','East Timor':'ASIA','Bhutan':'ASIA',
-      'Maldives':'ASIA',
-      // Africa
-      'South Africa':'AFRICA','Egypt':'AFRICA','Nigeria':'AFRICA',
-      'Morocco':'AFRICA','Algeria':'AFRICA','Tunisia':'AFRICA','Libya':'AFRICA',
-      'Sudan':'AFRICA','Ethiopia':'AFRICA','Kenya':'AFRICA','Tanzania':'AFRICA',
-      'Uganda':'AFRICA','Ghana':'AFRICA','Ivory Coast':'AFRICA','Senegal':'AFRICA',
-      'Cameroon':'AFRICA','Angola':'AFRICA','Mozambique':'AFRICA','Madagascar':'AFRICA',
-      'Zimbabwe':'AFRICA','Zambia':'AFRICA','Malawi':'AFRICA','Rwanda':'AFRICA',
-      'Burundi':'AFRICA','Somalia':'AFRICA','Djibouti':'AFRICA','Eritrea':'AFRICA',
-      'Mauritania':'AFRICA','Mali':'AFRICA','Burkina Faso':'AFRICA','Niger':'AFRICA',
-      'Chad':'AFRICA','Central African Republic':'AFRICA','Congo':'AFRICA',
-      'DR Congo':'AFRICA','Gabon':'AFRICA','Equatorial Guinea':'AFRICA',
-      'Sao Tome':'AFRICA','Guinea':'AFRICA','Sierra Leone':'AFRICA','Liberia':'AFRICA',
-      'Togo':'AFRICA','Benin':'AFRICA','Mauritius':'AFRICA','Seychelles':'AFRICA',
-      'Comoros':'AFRICA','Cape Verde':'AFRICA','Guinea-Bissau':'AFRICA',
-      'Gambia':'AFRICA','Lesotho':'AFRICA','Swaziland':'AFRICA','Botswana':'AFRICA',
-      'Namibia':'AFRICA',
-      // Oceania
-      'Australia':'OCEANIA','New Zealand':'OCEANIA','Papua New Guinea':'OCEANIA',
-      'Fiji':'OCEANIA','Solomon Islands':'OCEANIA','Vanuatu':'OCEANIA',
-      'Samoa':'OCEANIA','Tonga':'OCEANIA','Palau':'OCEANIA','Micronesia':'OCEANIA',
-      'Marshall Islands':'OCEANIA','Norfolk Island':'OCEANIA','Christmas Island':'OCEANIA',
-      'Cocos Islands':'OCEANIA',
-      // Other
+      'USA':'NORTH AMERICA','Canada':'NORTH AMERICA','Mexico':'NORTH AMERICA','Guatemala':'NORTH AMERICA','Honduras':'NORTH AMERICA','El Salvador':'NORTH AMERICA','Nicaragua':'NORTH AMERICA','Costa Rica':'NORTH AMERICA','Panama':'NORTH AMERICA','Cuba':'NORTH AMERICA','Jamaica':'NORTH AMERICA','Haiti':'NORTH AMERICA','Dominican Republic':'NORTH AMERICA','Trinidad':'NORTH AMERICA','Barbados':'NORTH AMERICA','Bahamas':'NORTH AMERICA','Belize':'NORTH AMERICA',
+      'Brazil':'SOUTH AMERICA','Argentina':'SOUTH AMERICA','Chile':'SOUTH AMERICA','Colombia':'SOUTH AMERICA','Peru':'SOUTH AMERICA','Ecuador':'SOUTH AMERICA','Venezuela':'SOUTH AMERICA','Uruguay':'SOUTH AMERICA','Paraguay':'SOUTH AMERICA','Bolivia':'SOUTH AMERICA','Suriname':'SOUTH AMERICA','Guyana':'SOUTH AMERICA','French Guiana':'SOUTH AMERICA',
+      'Germany':'EUROPE','UK':'EUROPE','France':'EUROPE','Italy':'EUROPE','Spain':'EUROPE','Netherlands':'EUROPE','Poland':'EUROPE','Belgium':'EUROPE','Sweden':'EUROPE','Switzerland':'EUROPE','Greece':'EUROPE','Portugal':'EUROPE','Czech Republic':'EUROPE','Romania':'EUROPE','Hungary':'EUROPE','Bulgaria':'EUROPE','Croatia':'EUROPE','Serbia':'EUROPE','Slovakia':'EUROPE','Slovenia':'EUROPE','Austria':'EUROPE','Denmark':'EUROPE','Norway':'EUROPE','Finland':'EUROPE','Ireland':'EUROPE','Cyprus':'EUROPE','Albania':'EUROPE','Bosnia':'EUROPE','Macedonia':'EUROPE','Montenegro':'EUROPE','Kosovo':'EUROPE','Iceland':'EUROPE','Luxembourg':'EUROPE','Malta':'EUROPE','Monaco':'EUROPE','Andorra':'EUROPE','Liechtenstein':'EUROPE','San Marino':'EUROPE','Vatican':'EUROPE','Jersey':'EUROPE','Guernsey':'EUROPE','Isle of Man':'EUROPE','Faroe Islands':'EUROPE','Greenland':'EUROPE','Svalbard':'EUROPE','Ukraine':'EUROPE','Lithuania':'EUROPE','Latvia':'EUROPE','Estonia':'EUROPE','Moldova':'EUROPE','Belarus':'EUROPE',
+      'China':'ASIA','India':'ASIA','Japan':'ASIA','Korea':'ASIA','South Korea':'ASIA','Indonesia':'ASIA','Thailand':'ASIA','Vietnam':'ASIA','Philippines':'ASIA','Malaysia':'ASIA','Singapore':'ASIA','Pakistan':'ASIA','Bangladesh':'ASIA','Myanmar':'ASIA','Cambodia':'ASIA','Laos':'ASIA','Nepal':'ASIA','Sri Lanka':'ASIA','Afghanistan':'ASIA','Iraq':'ASIA','Iran':'ASIA','Israel':'ASIA','Jordan':'ASIA','Lebanon':'ASIA','Kuwait':'ASIA','Qatar':'ASIA','Oman':'ASIA','Bahrain':'ASIA','Yemen':'ASIA','Syria':'ASIA','Saudi Arabia':'ASIA','UAE':'ASIA','Turkey':'ASIA','Kazakhstan':'ASIA','Uzbekistan':'ASIA','Kyrgyzstan':'ASIA','Tajikistan':'ASIA','Turkmenistan':'ASIA','Azerbaijan':'ASIA','Armenia':'ASIA','Georgia':'ASIA','Mongolia':'ASIA','North Korea':'ASIA','Taiwan':'ASIA','Hong Kong':'ASIA','Macau':'ASIA','Brunei':'ASIA','East Timor':'ASIA','Bhutan':'ASIA','Maldives':'ASIA',
+      'South Africa':'AFRICA','Egypt':'AFRICA','Nigeria':'AFRICA','Morocco':'AFRICA','Algeria':'AFRICA','Tunisia':'AFRICA','Libya':'AFRICA','Sudan':'AFRICA','Ethiopia':'AFRICA','Kenya':'AFRICA','Tanzania':'AFRICA','Uganda':'AFRICA','Ghana':'AFRICA','Ivory Coast':'AFRICA','Senegal':'AFRICA','Cameroon':'AFRICA','Angola':'AFRICA','Mozambique':'AFRICA','Madagascar':'AFRICA','Zimbabwe':'AFRICA','Zambia':'AFRICA','Malawi':'AFRICA','Rwanda':'AFRICA','Burundi':'AFRICA','Somalia':'AFRICA','Djibouti':'AFRICA','Eritrea':'AFRICA','Mauritania':'AFRICA','Mali':'AFRICA','Burkina Faso':'AFRICA','Niger':'AFRICA','Chad':'AFRICA','Central African Republic':'AFRICA','Congo':'AFRICA','DR Congo':'AFRICA','Gabon':'AFRICA','Equatorial Guinea':'AFRICA','Sao Tome':'AFRICA','Guinea':'AFRICA','Sierra Leone':'AFRICA','Liberia':'AFRICA','Togo':'AFRICA','Benin':'AFRICA','Mauritius':'AFRICA','Seychelles':'AFRICA','Comoros':'AFRICA','Cape Verde':'AFRICA','Guinea-Bissau':'AFRICA','Gambia':'AFRICA','Lesotho':'AFRICA','Swaziland':'AFRICA','Botswana':'AFRICA','Namibia':'AFRICA',
+      'Australia':'OCEANIA','New Zealand':'OCEANIA','Papua New Guinea':'OCEANIA','Fiji':'OCEANIA','Solomon Islands':'OCEANIA','Vanuatu':'OCEANIA','Samoa':'OCEANIA','Tonga':'OCEANIA','Palau':'OCEANIA','Micronesia':'OCEANIA','Marshall Islands':'OCEANIA','Norfolk Island':'OCEANIA','Christmas Island':'OCEANIA','Cocos Islands':'OCEANIA',
       'Russia':'RUSSIA & CIS'
     };
-    
-    const continentColors = {
-      'ASIA':'rgb(80,80,120)','EUROPE':'rgb(120,80,80)','NORTH AMERICA':'rgb(80,120,80)',
-      'SOUTH AMERICA':'rgb(120,120,80)','AFRICA':'rgb(120,80,120)','OCEANIA':'rgb(80,120,120)',
-      'RUSSIA & CIS':'rgb(100,100,100)','OTHER':'rgb(60,60,60)'
-    };
-    
-    const getContinent = (c) => countryToContinent[c] || 'OTHER';
 
-    // -------- Finviz 스타일 색상 계산 함수 --------
-    function getFinvizColor(change) {
-      // 중립 (0% 근처, -0.5% ~ +0.5%)
-      if (Math.abs(change) < 0.5) {
-        return '#3D444C';
-      }
-      
-      // 상승 그라데이션
-      if (change > 0) {
-        if (change >= 3) {
-          return '#00FF00'; // 급등 (≥+3%)
-        } else if (change >= 2) {
-          return '#00E676'; // 큰 상승 (+2~3%)
-        } else if (change >= 1) {
-          return '#00C853'; // 보통 상승 (+1~2%)
-        } else {
-          return '#39D353'; // 약한 상승 (+0~1%)
-        }
-      }
-      
-      // 하락 그라데이션
-      if (change <= -3) {
-        return '#FF0000'; // 급락 (≤-3%)
-      } else if (change <= -2) {
-        return '#FF1A1A'; // 큰 하락 (-2~-3%)
-      } else if (change <= -1) {
-        return '#FF3B3B'; // 보통 하락 (-1~-2%)
-      } else {
-        return '#FF6E6E'; // 약한 하락 (-0~-1%)
-      }
+    const getContinent = (c)=> countryToContinent[c] || 'OTHER';
+
+    // ---------- Continuous green↔gray↔red color (Finviz-ish) ----------
+    function colorFromChange(change){
+      // Clamp at [-5%, +5%] for color intensity
+      const c = Math.max(-5, Math.min(5, change));
+      // Map -5→0 (red), 0→60 (neutral gray), +5→120 (green) using HSL
+      const hue = c >= 0 ? 60 + (c/5)*60 : 60 + (c/5)*60; // around 60 is grayish
+      const sat = 80; const light = 45; // strong colors
+      // For near zero, use neutral tile gray
+      if (Math.abs(change) < 0.4) return '#3D444C';
+      return `hsl(${120*(c+5)/10}, ${sat}%, ${light}%)`;
     }
 
-    // -------- 샘플 데이터 생성 (250개 국가) --------
+    // ---------- Sample data ----------
     function generateSampleData(){
-      const countries = [], day1 = [], day2 = [], day3 = [];
-      const countryNames = [
-        'USA','China','India','Japan','Korea','Brazil','Germany','UK','France','Russia',
-        'Indonesia','Thailand','Vietnam','Philippines','Mexico','Turkey','Spain','Italy','Canada','Australia',
-        'Argentina','Netherlands','Saudi Arabia','South Africa','Poland','Belgium','Sweden','Switzerland','Chile','Colombia',
-        'Malaysia','Singapore','UAE','Egypt','Nigeria','Pakistan','Bangladesh','Myanmar','Cambodia','Laos',
-        'Nepal','Sri Lanka','Afghanistan','Iraq','Iran','Israel','Jordan','Lebanon','Kuwait','Qatar',
-        'Oman','Bahrain','Yemen','Syria','Cyprus','Greece','Portugal','Czech Republic','Romania','Hungary',
-        'Bulgaria','Croatia','Serbia','Slovakia','Slovenia','Austria','Denmark','Norway','Finland','Ireland',
-        'New Zealand','Peru','Ecuador','Venezuela','Uruguay','Paraguay','Bolivia','Guatemala','Honduras','El Salvador',
-        'Nicaragua','Costa Rica','Panama','Cuba','Jamaica','Haiti','Dominican Republic','Trinidad','Barbados','Bahamas',
-        'Morocco','Algeria','Tunisia','Libya','Sudan','Ethiopia','Kenya','Tanzania','Uganda','Ghana',
-        'Ivory Coast','Senegal','Cameroon','Angola','Mozambique','Madagascar','Zimbabwe','Zambia','Malawi','Rwanda',
-        'Burundi','Somalia','Djibouti','Eritrea','Mauritania','Mali','Burkina Faso','Niger','Chad','Central African Republic',
-        'Congo','DR Congo','Gabon','Equatorial Guinea','Sao Tome','Guinea','Sierra Leone','Liberia','Togo','Benin',
-        'Kazakhstan','Uzbekistan','Kyrgyzstan','Tajikistan','Turkmenistan','Azerbaijan','Armenia','Georgia','Moldova','Belarus',
-        'Ukraine','Lithuania','Latvia','Estonia','Mongolia','North Korea','Taiwan','Hong Kong','Macau','Brunei',
-        'East Timor','Papua New Guinea','Fiji','Solomon Islands','Vanuatu','Samoa','Tonga','Palau','Micronesia','Marshall Islands',
-        'Maldives','Mauritius','Seychelles','Comoros','Cape Verde','Guinea-Bissau','Gambia','Lesotho','Swaziland','Botswana',
-        'Namibia','Albania','Bosnia','Macedonia','Montenegro','Kosovo','Iceland','Luxembourg','Malta','Monaco',
-        'Andorra','Liechtenstein','San Marino','Vatican','Lichtenstein','Jersey','Guernsey','Isle of Man','Faroe Islands','Greenland',
-        'Bhutan','Maldives','Suriname','Guyana','French Guiana','Belize','Falkland Islands','South Georgia','Saint Helena','Ascension',
-        'Tristan da Cunha','Pitcairn','Norfolk Island','Christmas Island','Cocos Islands','Heard Island','Bouvet Island','Svalbard','Jan Mayen','Antarctica'
-      ];
-      let seed = 12345;
-      function rnd() {
-        seed = (seed * 9301 + 49297) % 233280;
-        return seed / 233280;
-      }
-      for(let i = 0; i < 250; i++){
-        const name = i < countryNames.length ? countryNames[i] : `Country${i+1}`;
+      const countries=[],d1=[],d2=[],d3=[];
+      const names=['USA','China','India','Japan','Korea','Brazil','Germany','UK','France','Russia','Indonesia','Thailand','Vietnam','Philippines','Mexico','Turkey','Spain','Italy','Canada','Australia','Argentina','Netherlands','Saudi Arabia','South Africa','Poland','Belgium','Sweden','Switzerland','Chile','Colombia','Malaysia','Singapore','UAE','Egypt','Nigeria','Pakistan','Bangladesh','Myanmar','Cambodia','Laos','Nepal','Sri Lanka','Afghanistan','Iraq','Iran','Israel','Jordan','Lebanon','Kuwait','Qatar','Oman','Bahrain','Yemen','Syria','Cyprus','Greece','Portugal','Czech Republic','Romania','Hungary','Bulgaria','Croatia','Serbia','Slovakia','Slovenia','Austria','Denmark','Norway','Finland','Ireland','New Zealand','Peru','Ecuador','Venezuela','Uruguay','Paraguay','Bolivia','Guatemala','Honduras','El Salvador','Nicaragua','Costa Rica','Panama','Cuba','Jamaica','Haiti','Dominican Republic','Trinidad','Barbados','Bahamas','Morocco','Algeria','Tunisia','Libya','Sudan','Ethiopia','Kenya','Tanzania','Uganda','Ghana','Ivory Coast','Senegal','Cameroon','Angola','Mozambique','Madagascar','Zimbabwe','Zambia','Malawi','Rwanda','Burundi','Somalia','Djibouti','Eritrea','Mauritania','Mali','Burkina Faso','Niger','Chad','Central African Republic','Congo','DR Congo','Gabon','Equatorial Guinea','Sao Tome','Guinea','Sierra Leone','Liberia','Togo','Benin','Kazakhstan','Uzbekistan','Kyrgyzstan','Tajikistan','Turkmenistan','Azerbaijan','Armenia','Georgia','Moldova','Belarus','Ukraine','Lithuania','Latvia','Estonia','Mongolia','North Korea','Taiwan','Hong Kong','Macau','Brunei','East Timor','Papua New Guinea','Fiji','Solomon Islands','Vanuatu','Samoa','Tonga','Palau','Micronesia','Marshall Islands','Maldives','Mauritius','Seychelles','Comoros','Cape Verde','Guinea-Bissau','Gambia','Lesotho','Swaziland','Botswana','Namibia','Albania','Bosnia','Macedonia','Montenegro','Kosovo','Iceland','Luxembourg','Malta','Monaco','Andorra','Liechtenstein','San Marino','Vatican','Lichtenstein','Jersey','Guernsey','Isle of Man','Faroe Islands','Greenland','Bhutan','Maldives','Suriname','Guyana','French Guiana','Belize','Falkland Islands','South Georgia','Saint Helena','Ascension','Tristan da Cunha','Pitcairn','Norfolk Island','Christmas Island','Cocos Islands','Heard Island','Bouvet Island','Svalbard','Jan Mayen','Antarctica'];
+      let seed=12345; function rnd(){ seed=(seed*9301+49297)%233280; return seed/233280; }
+      for(let i=0;i<250;i++){
+        const name = i<names.length?names[i]:`Country${i+1}`;
         countries.push(name);
-        const base = 500000 * Math.pow(0.92, i);
-        const v = base * 0.1 * (rnd() - 0.5);
-        const r1 = Math.max(1000, Math.round(base + v));
-        const r2 = Math.round(r1 * (1 + (rnd() * 0.1 - 0.05)));
-        const r3 = Math.round(r2 * (1 + (rnd() * 0.15 - 0.05)));
-        day1.push(r1);
-        day2.push(r2);
-        day3.push(r3);
+        const base=500000*Math.pow(0.92,i);
+        const v=base*0.1*(rnd()-0.5);
+        const r1=Math.max(1000,Math.round(base+v));
+        const r2=Math.round(r1*(1+(rnd()*0.1-0.05)));
+        const r3=Math.round(r2*(1+(rnd()*0.15-0.05)));
+        d1.push(r1); d2.push(r2); d3.push(r3);
       }
-      return {Country: countries, Day1: day1, Day2: day2, Day3: day3};
+      return {Country:countries, Day1:d1, Day2:d2, Day3:d3};
     }
-    
+
     const sampleData = generateSampleData();
-        let currentData = sampleData;
+    let currentData = sampleData;
 
-    // -------- CSV 로딩 --------
-    function loadCSV(){
-      const f = document.getElementById('csvFile').files[0];
-      if(!f) {
-                alert('Please select a file.');
-                return;
-            }
-      Papa.parse(f, {
-                header: true,
-                skipEmptyLines: true,
-        complete: (res) => {
-          const p = processData(res.data);
-          if(p) {
-            currentData = p;
-                        document.getElementById('status').textContent = 'CSV Loaded';
-                        createTreemap(currentData);
-                    }
-                },
-        error: (e) => alert('Error reading CSV: ' + e)
+    // ---------- CSV load ----------
+    document.getElementById('btnLoad').addEventListener('click', ()=>{
+      const f=document.getElementById('csvFile').files[0];
+      if(!f){ alert('Please select a file.'); return; }
+      Papa.parse(f,{header:true,skipEmptyLines:true,
+        complete:({data})=>{ const p=processData(data); if(p){ currentData=p; document.getElementById('status').textContent='CSV Loaded'; createTreemap(currentData); } },
+        error:(e)=> alert('Error reading CSV: '+e)
       });
-    }
-    
+    });
+
     function processData(rows){
-      try {
-        const countries = [], d1 = [], d2 = [], d3 = [];
-        rows.forEach(row => {
-          if(row.Country && row.Day1 && row.Day2 && row.Day3){
-                        countries.push(row.Country);
-            d1.push(parseInt(row.Day1));
-            d2.push(parseInt(row.Day2));
-            d3.push(parseInt(row.Day3));
-          }
-        });
-        if(!countries.length) {
-                    alert('No valid data found. Check CSV format.');
-                    return null;
-                }
-        return {Country: countries, Day1: d1, Day2: d2, Day3: d3};
-      } catch(e) {
-        alert('Error processing data: ' + e);
-                return null;
-            }
-        }
+      try{
+        const c=[],d1=[],d2=[],d3=[];
+        rows.forEach(r=>{ if(r.Country && r.Day1 && r.Day2 && r.Day3){ c.push(r.Country); d1.push(+r.Day1); d2.push(+r.Day2); d3.push(+r.Day3); } });
+        if(!c.length){ alert('No valid data found. Check CSV format.'); return null; }
+        return {Country:c, Day1:d1, Day2:d2, Day3:d3};
+      }catch(e){ alert('Error processing data: '+e); return null; }
+    }
 
-    // -------- 통계 계산 --------
+    // ---------- Stats ----------
     function calculateStats(data){
-      const totalRevenue = [], changePercent = [];
-      for(let i = 0; i < data.Country.length; i++){
-                const total = data.Day1[i] + data.Day2[i] + data.Day3[i];
-                totalRevenue.push(total);
-        changePercent.push(((data.Day3[i] - data.Day1[i]) / data.Day1[i]) * 100);
+      const total=[], change=[];
+      for(let i=0;i<data.Country.length;i++){
+        const t=data.Day1[i]+data.Day2[i]+data.Day3[i]; total.push(t);
+        change.push(((data.Day3[i]-data.Day1[i])/data.Day1[i])*100);
       }
-      const topCount = parseInt(document.getElementById('topCount')?.value || 250) || 250;
-      const sortBy = document.getElementById('sortBy')?.value || 'revenue';
-
+      const topN = +document.getElementById('topCount').value || 180;
+      const sortBy = document.getElementById('sortBy').value || 'revenue';
       let idx;
-      if(sortBy === 'revenue'){
-        idx = Array.from({length: data.Country.length}, (_, i) => i)
-          .sort((a, b) => totalRevenue[b] - totalRevenue[a]).slice(0, topCount);
-      } else {
-        idx = Array.from({length: data.Country.length}, (_, i) => i)
-          .sort((a, b) => Math.abs(changePercent[b]) - Math.abs(changePercent[a])).slice(0, topCount);
-      }
-      const topCountries = idx.map(i => data.Country[i]);
-      const topRevenue = idx.map(i => totalRevenue[i]);
-      const topChange = idx.map(i => changePercent[i]);
-            
-            const totalSum = topRevenue.reduce((a, b) => a + b, 0);
-            const avgChange = topChange.reduce((a, b) => a + b, 0) / topChange.length;
-            const maxChange = Math.max(...topChange);
-            const minChange = Math.min(...topChange);
-            
-      return {totalSum, avgChange, maxChange, minChange, topCountries, topRevenue, topChange, indices: idx};
+      if(sortBy==='revenue') idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> total[b]-total[a]).slice(0,topN);
+      else idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> Math.abs(change[b])-Math.abs(change[a])).slice(0,topN);
+
+      const topCountries=idx.map(i=>data.Country[i]);
+      const topRevenue=idx.map(i=>total[i]);
+      const topChange=idx.map(i=>change[i]);
+      const totalSum=topRevenue.reduce((a,b)=>a+b,0);
+      const avgChange=topChange.reduce((a,b)=>a+b,0)/topChange.length;
+      return {topCountries, topRevenue, topChange, totalSum, avgChange,
+              maxChange:Math.max(...topChange), minChange:Math.min(...topChange)};
     }
 
-    function updateDisplay() {
-      createTreemap(currentData);
-    }
+    // ---------- Render ----------
+    const overlay=document.getElementById('loadingOverlay');
+    ['topCount','sortBy','groupByContinent','compactLabels'].forEach(id=>{
+      document.getElementById(id).addEventListener('change', ()=> createTreemap(currentData));
+    });
 
-    // -------- Treemap 생성 --------
     function createTreemap(data){
-      const overlay = document.getElementById('loadingOverlay');
-      if(overlay) overlay.style.display = 'flex';
+      if(overlay) overlay.style.display='flex';
+      setTimeout(()=>{
+        const stats=calculateStats(data);
+        const topN=+document.getElementById('topCount').value || 180;
+        const groupBy=document.getElementById('groupByContinent').checked;
+        const compact=document.getElementById('compactLabels').checked;
+        const subtitleEl=document.getElementById('subtitleText');
+        if(subtitleEl) subtitleEl.textContent = `${topN} Countries — 3-Day Traffic Analysis`;
 
-      setTimeout(() => {
-            const stats = calculateStats(data);
-        const topCount = parseInt(document.getElementById('topCount')?.value || 250) || 250;
-        const groupByContinent = document.getElementById('groupByContinent')?.checked ?? true;
-
-        // 배지 유지: 텍스트만 갱신
-        const subtitleEl = document.getElementById('subtitleText');
-        if(subtitleEl) subtitleEl.textContent = `${topCount} Countries - 3-Day Traffic Analysis`;
-
-        // 상단 KPI
+        // KPIs
             document.getElementById('stats').innerHTML = `
-                <div class="stat-item">
-            <div class="stat-label">Total Traffic</div>
-            <div class="stat-value">${(stats.totalSum / 1000000).toFixed(2)}M</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Avg Change</div>
-                    <div class="stat-value ${stats.avgChange >= 0 ? 'positive' : 'negative'}">${stats.avgChange >= 0 ? '+' : ''}${stats.avgChange.toFixed(2)}%</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Max Increase</div>
-                    <div class="stat-value positive">+${stats.maxChange.toFixed(2)}%</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Max Decrease</div>
-                    <div class="stat-value negative">${stats.minChange.toFixed(2)}%</div>
-                </div>
-        `;
+          <div class="stat-item"><div class="stat-label">Total Traffic</div><div class="stat-value">${(stats.totalSum/1e6).toFixed(2)}M</div></div>
+          <div class="stat-item"><div class="stat-label">Avg Change</div><div class="stat-value ${stats.avgChange>=0?'positive':'negative'}">${stats.avgChange>=0?'+':''}${stats.avgChange.toFixed(2)}%</div></div>
+          <div class="stat-item"><div class="stat-label">Max Increase</div><div class="stat-value positive">+${stats.maxChange.toFixed(2)}%</div></div>
+          <div class="stat-item"><div class="stat-label">Max Decrease</div><div class="stat-value negative">${stats.minChange.toFixed(2)}%</div></div>`;
 
-        // 트리 데이터 컨테이너
-        let ids = [], labels = [], parents = [], values = [], colors = [], text = [], customdata = [];
-        if(groupByContinent){
-          // 1) 대륙별로 묶기
-          const byCont = {};
-          stats.topCountries.forEach((country, i) => {
-            const cont = getContinent(country);
-            if(!byCont[cont]) byCont[cont] = {countries: [], revenues: [], changes: []};
-            byCont[cont].countries.push(country);
-            byCont[cont].revenues.push(stats.topRevenue[i]);
-            byCont[cont].changes.push(stats.topChange[i]);
-          });
+        // Build treemap arrays
+        let ids=[], labels=[], parents=[], values=[], colors=[], text=[], custom=[];
 
-          // 대륙 정렬 (총합 기준)
-          const continents = Object.keys(byCont).sort((a, b) => {
-            const sa = byCont[a].revenues.reduce((x, y) => x + y, 0);
-            const sb = byCont[b].revenues.reduce((x, y) => x + y, 0);
-            return sb - sa;
-          });
+        if(groupBy){
+          const groups={};
+          stats.topCountries.forEach((c,i)=>{ const G=getContinent(c); (groups[G]||(groups[G]={c:[],v:[],chg:[]})).c.push(c); groups[G].v.push(stats.topRevenue[i]); groups[G].chg.push(stats.topChange[i]); });
+          const continents=Object.keys(groups).sort((a,b)=> groups[b].v.reduce((x,y)=>x+y,0)-groups[a].v.reduce((x,y)=>x+y,0));
 
-          continents.forEach(cont => {
-            const dataC = byCont[cont];
-            const total = dataC.revenues.reduce((a, b) => a + b, 0);
-            const avgCh = dataC.changes.reduce((a, b) => a + b, 0) / dataC.changes.length;
+          continents.forEach(cont=>{
+            const g=groups[cont];
+            const total=g.v.reduce((a,b)=>a+b,0);
+            const contId=`continent:${cont}`;
+            ids.push(contId); labels.push(cont); parents.push(''); values.push(total); colors.push('#2B2F3A'); text.push(''); custom.push([null,null,cont]);
 
-            const contId = `continent:${cont}`;
-            ids.push(contId);
-            labels.push(cont);
-            parents.push('');
-            values.push(total);
-            colors.push('#FFFFFF'); // 섹터 경계선을 흰색으로
-            text.push('SECTOR');
-            customdata.push([avgCh, null, cont]);
-
-            // 자식(국가)
-            dataC.countries.forEach((country, i) => {
-              const revenue = dataC.revenues[i];
-              const change = dataC.changes[i];
-              const color = getFinvizColor(change);
-
+            // thresholds for label density by share
+            const small=0.010, medium=0.025;
+            const maxAbsChange = Math.max(...g.chg.map(c => Math.abs(c)));
+            g.c.forEach((country,i)=>{
+              const revenue=g.v[i];
+              const change=g.chg[i];
+              const share=revenue/total; // area fraction approx
+              const col=colorFromChange(change);
+              // 변화량에 따른 글씨 크기 (절대값 기준, 최소 12px, 최대 24px)
+              const changeIntensity = Math.abs(change) / Math.max(maxAbsChange, 1);
+              const fontSize = Math.max(12, Math.min(24, 12 + changeIntensity * 12));
               ids.push(`country:${cont}:${country}`);
               labels.push(country);
               parents.push(contId);
               values.push(revenue);
-              colors.push(color);
-              text.push(`${(revenue / 1000).toFixed(0)}K<br>${change >= 0 ? '+' : ''}${change.toFixed(1)}%`);
-              customdata.push([change, revenue, cont]);
+              colors.push(col);
+              let t='';
+              if(share>=medium){
+                t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.7}px;display:block;text-align:center">${(revenue/1000).toFixed(0)}K</span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${change>=0?'+':''}${change.toFixed(1)}%</span>`;
+              }else if(share>=small){
+                t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${change>=0?'+':''}${change.toFixed(1)}%</span>`;
+              }else{
+                t = compact ? '' : `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span>`;
+              }
+              text.push(t);
+              custom.push([change, revenue, cont]);
             });
           });
-        } else {
-          // 2) 평면(대륙 그룹 없이)
-          stats.topCountries.forEach((country, i) => {
-            const rev = stats.topRevenue[i];
-            const ch = stats.topChange[i];
-            const color = getFinvizColor(ch);
-
-            ids.push(`country::${country}`);
-            labels.push(country);
-            parents.push('');
-            values.push(rev);
-            colors.push(color);
-            text.push(`${(rev / 1000).toFixed(0)}K<br>${ch >= 0 ? '+' : ''}${ch.toFixed(1)}%`);
-            customdata.push([ch, rev, getContinent(country)]);
+                } else {
+          const total = stats.topRevenue.reduce((a,b)=>a+b,0);
+          const small=0.006, medium=0.018;
+          const maxAbsChange = Math.max(...stats.topChange.map(c => Math.abs(c)));
+          stats.topCountries.forEach((country,i)=>{
+            const rev=stats.topRevenue[i]; const ch=stats.topChange[i]; const share=rev/total; const cont=getContinent(country);
+            // 변화량에 따른 글씨 크기 (절대값 기준, 최소 12px, 최대 24px)
+            const changeIntensity = Math.abs(ch) / Math.max(maxAbsChange, 1);
+            const fontSize = Math.max(12, Math.min(24, 12 + changeIntensity * 12));
+            ids.push(`country::${country}`); labels.push(country); parents.push(''); values.push(rev); colors.push(colorFromChange(ch));
+            let t='';
+            if(share>=medium) t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.7}px;display:block;text-align:center">${(rev/1000).toFixed(0)}K</span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${ch>=0?'+':''}${ch.toFixed(1)}%</span>`;
+            else if(share>=small) t = `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span><span style="font-size:${fontSize*0.8}px;display:block;text-align:center">${ch>=0?'+':''}${ch.toFixed(1)}%</span>`;
+            else t = compact ? '' : `<span style="font-size:${fontSize}px;display:block;text-align:center"><b>${country}</b></span>`;
+            text.push(t);
+            custom.push([ch, rev, cont]);
           });
         }
 
-        // 길이 확인
-        if(!(ids.length === labels.length && labels.length === parents.length && labels.length === values.length && labels.length === colors.length && labels.length === text.length && labels.length === customdata.length)){
-          console.error('Array length mismatch', {ids: ids.length, labels: labels.length, parents: parents.length, values: values.length, colors: colors.length, text: text.length, customdata: customdata.length});
-        }
+        const height = 900; // fixed height for visual stability
 
-        const treemapHeight = Math.max(900, Math.min(1800, 600 + labels.length * 1.5));
-            
-            const trace = {
-                type: 'treemap',
+        const trace={
+          type:'treemap',
           ids, labels, parents, values,
-                marker: {
-            colors,
-            line: {
-              width: 1,
-              color: '#1E232C' // 개별 타일 경계선
-            }
-          },
-          tiling: { pad: groupByContinent ? 12 : 4 }, // 섹터 경계선 여백
-          text, textinfo: 'label+text',
-          textfont: {family: 'Arial, Helvetica, sans-serif', size: 12, color: '#ffffff'},
-          branchvalues: 'total',
-          maxdepth: groupByContinent ? 2 : 1,
-          hovertemplate:
-            '<b>%{label}</b><br>' +
-            'Traffic: %{value:,.0f}<br>' +
-            'Change: %{customdata[0]:.2f}%<br>' +
-            (groupByContinent ? 'Sector: %{customdata[2]}' : 'Sector: %{customdata[2]}') +
-            '<extra></extra>',
-          customdata
-            };
-            
-            const layout = {
-          paper_bgcolor: '#2B2F3A',
-          plot_bgcolor: '#2B2F3A',
-          margin: {l: 0, r: 0, t: 0, b: 0},
-          height: treemapHeight,
-          font: {family: 'Arial, Helvetica, sans-serif', size: 11, color: '#ffffff'},
-          uniformtext: {minsize: 8, mode: 'hide'}
+          text, textinfo:'text', textposition:'middle center',
+          marker:{ colors, line:{width:1, color:'#1E232C'}, depthfade:false },
+          tiling:{ pad: 12 },
+          branchvalues:'total', maxdepth:2,
+          hovertemplate:'<b>%{label}</b><br>Traffic: %{value:,.0f}<br>'+
+                        'Change: %{customdata[0]:.2f}%<br>Sector: %{customdata[2]}<extra></extra>',
+          customdata: custom,
+          pathbar:{visible:false},
+          textfont:{family:'Arial, Helvetica, sans-serif', color:'#ffffff', size:12}
         };
 
-        Plotly.newPlot('treemap', [trace], layout, {responsive: true}).then(() => {
-          if(overlay) overlay.style.display = 'none';
-        });
-      }, 50);
+        const layout={
+          paper_bgcolor: getComputedStyle(document.documentElement).getPropertyValue('--tile-gap').trim() || '#2B2F3A',
+          plot_bgcolor: getComputedStyle(document.documentElement).getPropertyValue('--tile-gap').trim() || '#2B2F3A',
+          margin:{l:0,r:0,t:0,b:0}, height,
+          font:{family:'Arial, Helvetica, sans-serif',size:11,color:'#ffffff'},
+          uniformtext:{minsize:10,mode:'hide'},
+          hoverlabel:{bgcolor:'#161b22',bordercolor:'#30363d',font:{color:'#fff'}}
+        };
+
+        Plotly.newPlot('treemap',[trace],layout,{responsive:true}).then(()=>{ if(overlay) overlay.style.display='none'; });
+      }, 40);
     }
 
-    // -------- 초기 로드 --------
-    window.onload = function(){
-      const overlay = document.getElementById('loadingOverlay');
-      if(overlay){
-        const t = overlay.querySelector('.loading-text');
-        if(t) t.textContent = '250개 국가 데이터를 생성하고 있습니다...';
-      }
-      setTimeout(() => {
-            createTreemap(currentData);
-      }, 100);
-        };
+    // initial draw
+    window.addEventListener('load',()=>{
+      const t=overlay?.querySelector('.loading-text'); if(t) t.textContent='샘플 데이터로 초기화 중...';
+      setTimeout(()=> createTreemap(currentData), 120);
+    });
     </script>
 </body>
 </html>
