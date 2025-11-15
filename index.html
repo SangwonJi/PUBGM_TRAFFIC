@@ -672,9 +672,10 @@
                         const continentTotal = data.revenues.reduce((a, b) => a + b, 0);
                         const continentAvgChange = data.changes.reduce((a, b) => a + b, 0) / data.changes.length;
                         
-                        // Add continent label (parent) - Only continent name, no stats
-                        // Use continent name as the label for parent node
-                        labels.push(continent);
+                        // Add continent label (parent) - Finviz style: continent name at top
+                        // Format continent label with styling
+                        const continentLabel = `<b style="font-size:24px;color:#ffffff;font-weight:bold;text-transform:uppercase">${continent}</b>`;
+                        labels.push(continentLabel);
                         parents.push(''); // Empty string means root level
                         values.push(continentTotal);
                         
