@@ -70,6 +70,39 @@
           <div class="loading-text" style="color:var(--muted)">데이터를 생성하고 있습니다...</div>
         </div>
       </div>
+      <div class="color-palette" style="margin-top:20px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Color Palette</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="width:24px;height:24px;background:#f63538;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+            <span style="color:#fff;font-size:13px;font-weight:600">-3%</span>
+          </div>
+          <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="width:24px;height:24px;background:#bf4045;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+            <span style="color:#fff;font-size:13px;font-weight:600">-2%</span>
+          </div>
+          <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="width:24px;height:24px;background:#8b444e;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+            <span style="color:#fff;font-size:13px;font-weight:600">-1%</span>
+          </div>
+          <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="width:24px;height:24px;background:#414554;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+            <span style="color:#fff;font-size:13px;font-weight:600">0%</span>
+          </div>
+          <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="width:24px;height:24px;background:#3e7c55;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+            <span style="color:#fff;font-size:13px;font-weight:600">+1%</span>
+          </div>
+          <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="width:24px;height:24px;background:#2f9e4f;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+            <span style="color:#fff;font-size:13px;font-weight:600">+2%</span>
+          </div>
+          <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+            <div style="width:24px;height:24px;background:#30cc5a;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+            <span style="color:#fff;font-size:13px;font-weight:600">+3%</span>
+          </div>
+        </div>
+      </div>
         </div>
         
     <div class="footer" style="padding:14px;background:var(--panel);border-top:1px solid var(--border);color:var(--muted);text-align:center;font-size:12px">
@@ -317,8 +350,7 @@
           hovertemplate:'<b>%{label}</b><br>Traffic: %{value:,.0f}<br>'+
                         'Change: %{customdata[0]:.2f}%<br>Sector: %{customdata[2]}<extra></extra>',
           customdata: custom,
-          pathbar:{visible:false},
-          textfont:{family:'Arial, Helvetica, sans-serif', color:'#FFFFFF', size:12, weight:'bold'}
+          pathbar:{visible:false}
         };
 
         const layout={
@@ -326,7 +358,6 @@
           plot_bgcolor: '#262931',
           margin:{l:0,r:0,t:0,b:0}, height,
           font:{family:'Arial, Helvetica, sans-serif',size:11,color:'#FFFFFF'},
-          uniformtext:{minsize:10,mode:'hide'},
           hoverlabel:{bgcolor:'#161b22',bordercolor:'#30363d',font:{color:'#fff'}}
         };
 
