@@ -105,6 +105,24 @@
           </div>
         </div>
       </div>
+      <div id="trafficTop10" style="margin-top:20px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Traffic Top 10 (DoD 기준)</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border)">
+                <th style="padding:8px;text-align:left;font-size:11px;color:var(--muted);font-weight:600">Rank</th>
+                <th style="padding:8px;text-align:left;font-size:11px;color:var(--muted);font-weight:600">Country</th>
+                <th style="padding:8px;text-align:right;font-size:11px;color:var(--muted);font-weight:600">Traffic</th>
+                <th style="padding:8px;text-align:right;font-size:11px;color:var(--muted);font-weight:600">Change</th>
+              </tr>
+            </thead>
+            <tbody id="trafficTop10Body">
+              <tr><td colspan="4" style="padding:12px;text-align:center;color:var(--muted);font-size:12px">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
         </div>
         
     <div class="footer" style="padding:14px;background:var(--panel);border-top:1px solid var(--border);color:var(--muted);text-align:center;font-size:12px">
@@ -399,8 +417,28 @@
       const topChange=idx.map(i=>change[i]);
       const totalSum=topRevenue.reduce((a,b)=>a+b,0);
       const avgChange=topChange.reduce((a,b)=>a+b,0)/topChange.length;
+      
+      // Max Increase/Decrease 국가 찾기
+      const maxChangeIdx = topChange.indexOf(Math.max(...topChange));
+      const minChangeIdx = topChange.indexOf(Math.min(...topChange));
+      const maxChangeCountry = topCountries[maxChangeIdx] || '';
+      const minChangeCountry = topCountries[minChangeIdx] || '';
+      
+      // Traffic Top 10 (DoD 기준 마지막 날 트래픽)
+      const allCountries = data.Country;
+      const allLastDayTraffic = total;
+      const trafficTop10 = Array.from({length:allCountries.length},(_,i)=>i)
+        .sort((a,b)=> allLastDayTraffic[b]-allLastDayTraffic[a])
+        .slice(0,10)
+        .map(i=>({
+          country: allCountries[i],
+          traffic: allLastDayTraffic[i],
+          change: change[i]
+        }));
+      
       return {topCountries, topRevenue, topChange, totalSum, avgChange,
-              maxChange:Math.max(...topChange), minChange:Math.min(...topChange)};
+              maxChange:Math.max(...topChange), minChange:Math.min(...topChange),
+              maxChangeCountry, minChangeCountry, trafficTop10};
     }
 
     // ---------- Render ----------
@@ -420,8 +458,25 @@
             document.getElementById('stats').innerHTML = `
           <div class="stat-item"><div class="stat-label">Total Traffic</div><div class="stat-value">${(stats.totalSum/1e6).toFixed(2)}M</div></div>
           <div class="stat-item"><div class="stat-label">Avg Change</div><div class="stat-value ${stats.avgChange>=0?'positive':'negative'}">${stats.avgChange>=0?'+':''}${stats.avgChange.toFixed(2)}%</div></div>
-          <div class="stat-item"><div class="stat-label">Max Increase</div><div class="stat-value positive">+${stats.maxChange.toFixed(2)}%</div></div>
-          <div class="stat-item"><div class="stat-label">Max Decrease</div><div class="stat-value negative">${stats.minChange.toFixed(2)}%</div></div>`;
+          <div class="stat-item"><div class="stat-label">Max Increase</div><div class="stat-value positive">+${stats.maxChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.maxChangeCountry})</span></div></div>
+          <div class="stat-item"><div class="stat-label">Max Decrease</div><div class="stat-value negative">${stats.minChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.minChangeCountry})</span></div></div>`;
+        
+        // Traffic Top 10 표 업데이트
+        const top10Body = document.getElementById('trafficTop10Body');
+        if(top10Body && stats.trafficTop10){
+          top10Body.innerHTML = stats.trafficTop10.map((item, idx) => {
+            const changeColor = item.change >= 0 ? '#00ff00' : '#ff4d4d';
+            const changeSign = item.change >= 0 ? '+' : '';
+            return `
+              <tr style="border-bottom:1px solid var(--border);${idx % 2 === 0 ? 'background:rgba(255,255,255,0.02)' : ''}">
+                <td style="padding:10px;font-size:13px;color:#fff;font-weight:600">${idx + 1}</td>
+                <td style="padding:10px;font-size:13px;color:#fff;font-weight:600">${item.country}</td>
+                <td style="padding:10px;text-align:right;font-size:13px;color:#fff">${(item.traffic/1e6).toFixed(2)}M</td>
+                <td style="padding:10px;text-align:right;font-size:13px;color:${changeColor};font-weight:600">${changeSign}${item.change.toFixed(2)}%</td>
+              </tr>
+            `;
+          }).join('');
+        }
 
         // Build treemap arrays
         let ids=[], labels=[], parents=[], values=[], colors=[], text=[], custom=[];
