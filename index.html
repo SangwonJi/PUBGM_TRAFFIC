@@ -246,72 +246,93 @@
           return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7};
         }
         
-        // 형식 2: Date,Country,Traffic (long format)
-        if(rows[0] && (rows[0].Date !== undefined || rows[0].날짜 !== undefined) && 
-           (rows[0].Country !== undefined || rows[0].국가 !== undefined) &&
-           (rows[0].Traffic !== undefined || rows[0].트래픽 !== undefined)){
-          
-          // 컬럼명 매핑 (다양한 언어 지원)
-          const dateCol = rows[0].Date !== undefined ? 'Date' : (rows[0].날짜 !== undefined ? '날짜' : null);
-          const countryCol = rows[0].Country !== undefined ? 'Country' : (rows[0].국가 !== undefined ? '국가' : null);
-          const trafficCol = rows[0].Traffic !== undefined ? 'Traffic' : (rows[0].트래픽 !== undefined ? '트래픽' : null);
-          
-          if(!dateCol || !countryCol || !trafficCol){
-            alert('CSV format error. Required columns: Date, Country, Traffic (or 날짜, 국가, 트래픽)');
-            return null;
+        // 형식 2: Date,Country,Traffic (long format) - 대소문자 구분 없이 찾기
+        const firstRow = rows[0] || {};
+        const allKeys = Object.keys(firstRow);
+        
+        // 컬럼명 찾기 (대소문자 구분 없이)
+        const findColumn = (keys, possibleNames) => {
+          const lowerKeys = keys.map(k => k.toLowerCase());
+          for(const name of possibleNames){
+            const lowerName = name.toLowerCase();
+            const idx = lowerKeys.indexOf(lowerName);
+            if(idx !== -1) return keys[idx];
           }
+          return null;
+        };
+        
+        const dateCol = findColumn(allKeys, ['Date', 'date', '날짜', 'Date']);
+        const countryCol = findColumn(allKeys, ['Country', 'country', '국가', 'Country']);
+        const trafficCol = findColumn(allKeys, ['Traffic', 'traffic', '트래픽', 'DAU', 'dau', 'Traffic']);
+        
+        if(dateCol && countryCol && trafficCol){
           
-          // 날짜별로 그룹화
-          const dateMap = {};
+          // 국가별로 데이터 그룹화
+          const countryDataMap = {};
+          
+          // 날짜 정규화 함수
+          const normalizeDate = (dateStr) => {
+            let normalized = dateStr.toString().trim();
+            normalized = normalized.replace(/\./g, '-').replace(/\s+/g, '');
+            normalized = normalized.replace(/-+/g, '-');
+            normalized = normalized.replace(/^-+|-+$/g, '');
+            
+            const parts = normalized.split('-');
+            if(parts.length >= 3){
+              const year = parseInt(parts[0]);
+              const month = parseInt(parts[1]);
+              const day = parseInt(parts[2]);
+              if(!isNaN(year) && !isNaN(month) && !isNaN(day)){
+                return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              }
+            }
+            return normalized;
+          };
+          
           rows.forEach(r=>{
             if(r[dateCol] && r[countryCol] && r[trafficCol]){
-              const date = r[dateCol].toString().trim();
+              const dateStr = normalizeDate(r[dateCol]);
               const country = r[countryCol].toString().trim();
               const traffic = +r[trafficCol];
               
-              if(!dateMap[date]) dateMap[date] = {};
-              dateMap[date][country] = traffic;
+              if(!countryDataMap[country]) countryDataMap[country] = {};
+              countryDataMap[country][dateStr] = traffic;
             }
           });
           
-          // 날짜 정렬 (날짜 문자열을 파싱하여 정렬)
-          const dates = Object.keys(dateMap).sort((a,b)=>{
-            // 날짜 형식이 다양할 수 있으므로 문자열 비교 시도
-            const dateA = new Date(a);
-            const dateB = new Date(b);
-            if(!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
-            return a.localeCompare(b);
-          });
-          
-          if(dates.length < 7){
-            alert(`Not enough dates found. Found ${dates.length} dates, need at least 7 days.`);
-            return null;
-          }
-          
-          // 처음 7일만 사용
-          const selectedDates = dates.slice(0, 7);
-          
-          // 모든 국가 수집
-          const allCountries = new Set();
-          selectedDates.forEach(date => {
-            Object.keys(dateMap[date]).forEach(country => allCountries.add(country));
-          });
-          
-          const countries = Array.from(allCountries);
+          // 각 국가별로 날짜 정렬하고 최대 7일 데이터 추출
+          const countries = Object.keys(countryDataMap);
           const c=[],d1=[],d2=[],d3=[],d4=[],d5=[],d6=[],d7=[];
           
           countries.forEach(country => {
+            const dates = Object.keys(countryDataMap[country]).sort((a,b)=>{
+              const dateA = new Date(a);
+              const dateB = new Date(b);
+              if(!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
+              return a.localeCompare(b);
+            });
+            
+            if(dates.length < 2){
+              // 최소 2일 데이터 필요 (DoD 계산을 위해)
+              return; // 이 국가는 스킵
+            }
+            
+            // 최대 7일까지 사용 (최신 데이터부터)
+            const selectedDates = dates.slice(-7); // 최근 7일
+            const dayCount = selectedDates.length;
+            
             c.push(country);
-            d1.push(dateMap[selectedDates[0]][country] || 0);
-            d2.push(dateMap[selectedDates[1]][country] || 0);
-            d3.push(dateMap[selectedDates[2]][country] || 0);
-            d4.push(dateMap[selectedDates[3]][country] || 0);
-            d5.push(dateMap[selectedDates[4]][country] || 0);
-            d6.push(dateMap[selectedDates[5]][country] || 0);
-            d7.push(dateMap[selectedDates[6]][country] || 0);
+            // 부족한 날짜는 0으로 채움
+            d1.push(dayCount >= 1 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount]] || 0 : 0);
+            d2.push(dayCount >= 2 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 1]] || 0 : 0);
+            d3.push(dayCount >= 3 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 2]] || 0 : 0);
+            d4.push(dayCount >= 4 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 3]] || 0 : 0);
+            d5.push(dayCount >= 5 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 4]] || 0 : 0);
+            d6.push(dayCount >= 6 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 5]] || 0 : 0);
+            d7.push(dayCount >= 7 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 6]] || 0 : 0);
           });
           
-          if(!c.length){ alert('No valid data found.'); return null; }
+          if(!c.length){ alert('No valid data found. Need at least 2 days of data for each country.'); return null; }
           return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7};
         }
         
@@ -324,9 +345,25 @@
     function calculateStats(data){
       const total=[], change=[];
       for(let i=0;i<data.Country.length;i++){
-        const t=data.Day1[i]+data.Day2[i]+data.Day3[i]+data.Day4[i]+data.Day5[i]+data.Day6[i]+data.Day7[i]; 
+        const days = [data.Day1[i], data.Day2[i], data.Day3[i], data.Day4[i], data.Day5[i], data.Day6[i], data.Day7[i]];
+        const t = days.reduce((a,b)=>a+b, 0);
         total.push(t);
-        change.push(((data.Day7[i]-data.Day1[i])/data.Day1[i])*100);
+        
+        // 실제 데이터가 있는 첫 날과 마지막 날 찾기
+        let firstDay = null, lastDay = null;
+        for(let j=0; j<days.length; j++){
+          if(days[j] > 0){
+            if(firstDay === null) firstDay = days[j];
+            lastDay = days[j];
+          }
+        }
+        
+        // 변화율 계산: 마지막 날 - 첫 날 (DoD: Day over Day)
+        if(firstDay !== null && lastDay !== null && firstDay > 0){
+          change.push(((lastDay - firstDay) / firstDay) * 100);
+        } else {
+          change.push(0);
+        }
       }
       const topN = +document.getElementById('topCount').value || 180;
       const sortBy = document.getElementById('sortBy').value || 'revenue';
