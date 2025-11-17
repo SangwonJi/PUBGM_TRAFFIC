@@ -378,11 +378,17 @@
       if(sortBy==='revenue'){
         idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> total[b]-total[a]).slice(0,topN);
       } else if(sortBy==='change_desc'){
-        // + 변화폭 큰 순 (양수 변화율 큰 순)
-        idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> change[b]-change[a]).slice(0,topN);
+        // + 변화폭 큰 순 (양수 변화율만, 큰 순서대로)
+        idx=Array.from({length:data.Country.length},(_,i)=>i)
+          .filter(i=> change[i] > 0) // 양수만 필터링
+          .sort((a,b)=> change[b]-change[a]) // 큰 순서대로
+          .slice(0,topN);
       } else if(sortBy==='change_asc'){
-        // - 변화폭 큰 순 (음수 변화율 큰 순, 즉 하락폭 큰 순)
-        idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> change[a]-change[b]).slice(0,topN);
+        // - 변화폭 큰 순 (음수 변화율만, 하락폭 큰 순서대로)
+        idx=Array.from({length:data.Country.length},(_,i)=>i)
+          .filter(i=> change[i] < 0) // 음수만 필터링
+          .sort((a,b)=> change[a]-change[b]) // 하락폭 큰 순서대로 (음수이므로 오름차순)
+          .slice(0,topN);
       } else {
         // change: 절대값 기준
         idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> Math.abs(change[b])-Math.abs(change[a])).slice(0,topN);
@@ -430,7 +436,7 @@
             const total=g.v.reduce((a,b)=>a+b,0);
             const contId=`continent:${cont}`;
             // 대륙 텍스트 크게 (볼드체) - Finviz 스타일
-            const continentTextShadow = 'text-shadow: 2px 2px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8);';
+            const continentTextShadow = 'text-shadow: 2px 2px 4px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.6);';
             ids.push(contId); labels.push(cont); parents.push(''); values.push(total); colors.push('#262931'); text.push(`<b style="font-size:86.4px;font-weight:900;letter-spacing:2px;color:#FFFFFF;${continentTextShadow}">${cont}</b>`); custom.push([null,null,cont]);
 
             // thresholds for label density by share
@@ -453,7 +459,7 @@
               colors.push(col);
               let t='';
               // 변화량만 표시, 볼드체, 명암 추가
-              const textShadow = 'text-shadow: 1px 1px 3px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.7);';
+              const textShadow = 'text-shadow: 1px 1px 3px rgba(0,0,0,0.7), 0 0 4px rgba(0,0,0,0.5);';
               if(share>=small){
                 t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b><br><b style="font-size:${Math.max(12,countryFontSize*0.75)}px;font-weight:bold;color:#FFFFFF;${textShadow}">${change>=0?'+':''}${change.toFixed(1)}%</b>`;
               }else{
