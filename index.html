@@ -407,14 +407,15 @@
       if(sortBy==='revenue'){
         idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> total[b]-total[a]).slice(0,topN);
       } else if(sortBy==='change_desc'){
-        // + 변화량 큰 순 (변화량이 큰 순서대로, 내림차순)
+        // + 변화량 큰 순 (변화량 절대값이 큰 순서대로)
         idx=Array.from({length:data.Country.length},(_,i)=>i)
-          .sort((a,b)=> change[b]-change[a]) // 변화량 큰 순서대로
+          .sort((a,b)=> Math.abs(change[b])-Math.abs(change[a])) // 절대값 기준 큰 순서
           .slice(0,topN);
       } else if(sortBy==='change_asc'){
-        // - 변화량 큰 순 (변화량이 작은 순서대로, 즉 하락폭 큰 순, 오름차순)
+        // - 변화량 큰 순 (하락폭이 큰 순서대로, 음수 중 절대값 큰 순)
         idx=Array.from({length:data.Country.length},(_,i)=>i)
-          .sort((a,b)=> change[a]-change[b]) // 변화량 작은 순서대로 (하락폭 큰 순)
+          .filter(i=> change[i] < 0) // 음수만 필터링
+          .sort((a,b)=> Math.abs(change[a])-Math.abs(change[b])) // 절대값 기준 큰 순서 (하락폭 큰 순)
           .slice(0,topN);
       }
 
