@@ -451,11 +451,12 @@
               values.push(revenue);
               colors.push(col);
               let t='';
-              // 변화량만 표시, 볼드체
+              // 변화량만 표시, 볼드체, 명암 추가
+              const textShadow = 'text-shadow: 1px 1px 3px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.7);';
               if(share>=small){
-                t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF">${country}</b><br><b style="font-size:${Math.max(12,countryFontSize*0.75)}px;font-weight:bold;color:#FFFFFF">${change>=0?'+':''}${change.toFixed(1)}%</b>`;
+                t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b><br><b style="font-size:${Math.max(12,countryFontSize*0.75)}px;font-weight:bold;color:#FFFFFF;${textShadow}">${change>=0?'+':''}${change.toFixed(1)}%</b>`;
               }else{
-                t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF">${country}</b>`;
+                t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b>`;
               }
               text.push(t);
               custom.push([change, revenue, cont]);
@@ -475,9 +476,10 @@
             const col = colorFromChange(ch, changeIntensity);
             ids.push(`country::${country}`); labels.push(country); parents.push(''); values.push(rev); colors.push(col);
             let t='';
-            // 변화량만 표시, 볼드체
-            if(share>=small) t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF">${country}</b><br><b style="font-size:${Math.max(12,countryFontSize*0.75)}px;font-weight:bold;color:#FFFFFF">${ch>=0?'+':''}${ch.toFixed(1)}%</b>`;
-            else t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF">${country}</b>`;
+            // 변화량만 표시, 볼드체, 명암 추가
+            const textShadow = 'text-shadow: 1px 1px 3px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.7);';
+            if(share>=small) t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b><br><b style="font-size:${Math.max(12,countryFontSize*0.75)}px;font-weight:bold;color:#FFFFFF;${textShadow}">${ch>=0?'+':''}${ch.toFixed(1)}%</b>`;
+            else t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b>`;
             text.push(t);
             custom.push([ch, rev, cont]);
           });
