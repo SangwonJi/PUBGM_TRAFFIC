@@ -61,6 +61,24 @@
         </select>
       </label>
       <label><input type="checkbox" id="groupByContinent" checked/> <strong>Group by Sector (Continent)</strong></label>
+      <label style="margin-top:8px"><strong>Comparison:</strong>
+        <select id="comparisonType" style="padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px;margin-left:8px;font-size:13px">
+          <option value="DoD" selected>DoD (Day over Day)</option>
+          <option value="WoW">WoW (Week over Week)</option>
+          <option value="MoM">MoM (Month over Month)</option>
+          <option value="YoY">YoY (Year over Year)</option>
+        </select>
+      </label>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:12px;border-top:1px solid var(--border)">
+        <label><strong>Date Range:</strong> 
+          <input type="date" id="startDate" style="padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px;margin-left:8px"/>
+        </label>
+        <label><strong>~</strong> 
+          <input type="date" id="endDate" style="padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px;margin-left:8px"/>
+        </label>
+        <button id="btnApplyDateRange" style="padding:6px 12px;background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:12px">Apply</button>
+        <button id="btnClearDateRange" style="padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:12px">Clear</button>
+      </div>
         </div>
         
         <div class="content">
@@ -125,7 +143,7 @@
         </div>
         
     <div class="footer" style="padding:14px;background:var(--panel);border-top:1px solid var(--border);color:var(--muted);text-align:center;font-size:12px">
-      📊 CSV Format: Date,Country,Traffic (or Country,Day1,Day2,Day3,Day4,Day5,Day6,Day7) · Hover tiles for details
+      📊 CSV Format: Date,Country,Traffic (날짜는 중구난방 가능, 나라별 자동 피벗) · Hover tiles for details
         </div>
     </div>
 
@@ -211,61 +229,168 @@
 
     // ---------- Sample data ----------
     function generateSampleData(){
-      const countries=[],d1=[],d2=[],d3=[],d4=[],d5=[],d6=[],d7=[];
+      const countries = [];
       const names=['Vatican','Saint Pierre and Miquelon','Montserrat','福克兰群岛','San Marino','Isle of Man','Niue','Cuba','Faroe Islands','Dutch Caribbean','Jersey','Bermuda','Sao Tome and Principe','Gibraltar','Andorra','Liechtenstein','Guinea-Bissau','Turks and Caicos Islands','Saint Martin','Sint Maarten','Anguilla','Central Africa','Equatorial Guinea','根西岛','Aruba','Burundi','United States Virgin Islands','Saint Kitts and Nevis','Nauru','Bahamas','Cayman Islands','Lesotho','Northern Mariana Islands','Cape Verde','Guadeloupe','Palau','Antigua and Barbuda','Swaziland','Monaco','other','Martinique','Iceland','Cook Islands','Reunion','Liberia','New Caledonia','Gambia','Sierra Leone','Guinea','EU','French Guiana','Rwanda','Grenada','Togo','Greenland','Benin','Haiti','Angola','South Sudan','Mozambique','Saint Vincent and the Grenadines','Macao','Malta','Namibia','Burkina Faso','Gabon','Barbados','Guam','Seychelles','Djibouti','Marshall Islands','Mali','Cameroon','Belize','Botswana','Trinidad and Tobago','Zimbabwe','Niger','Estonia','Malawi','Papua New Guinea','Puerto Rico','Fiji Islands','Zambia','Panama','Côte dIvoire','Senegal','Federated States of Micronesia','Luxembourg','Costa Rica','Slovenia','Ghana','Nicaragua','Bolivia','El Salvador','Paraguay','Uganda','Curacao','Uruguay','Korea','French Polynesia','Japan','Latvia','Honduras','Ireland','Surinam','Tonga','Solomon Islands','Montenegro','Denmark','Portugal','Dominica','Norway','Brunei','Croatia','Cyprus','Tunisia','Slovakia','Lithuania','Guatemala','Jamaica','Macedonia','Laos','new Zealand','Ecuador','Maldives','Venezuela','Peru','Tanzania','Chad','Guyana','Finland','Mauritania','Nigeria','Switzerland','Madagascar','China','Belgium','Bosnia and Herzegovina','Bahrain','Austria','East Timor','Albania','Bhutan','Colombia','Chile','Greece','Hungary','Sweden','Czech','Argentina','Tajikistan','Serbia','Sri Lanka','Spain','Moldova','Kenya','Poland','Ethiopia','Italy','Sudan','Australia','Mauritius','Armenia','South Africa','Kuwait','Oman','Qatar','Cambodia','Bulgaria','Iran','Morocco','Kyrgyzstan','Mongolia','Canada','Romania','Georgia','Belarus','Netherlands','Taiwan','Somalia','Israel','Turkmenistan','Mexico','Singapore','Kazakhstan','Brazil','Syria','United Arab Emirates','Palestine','United Kingdom','Afghanistan','Jordan','Yemen','France','Algeria','Undefined','Nepal','Lebanon','Bengal','Philippines','Azerbaijan','Libya','Hong Kong','Thailand','Malaysia','Myanmar','Ukraine','Vietnam','Germany','United States','Saudi Arabia','Uzbekistan','Indonesia','Egypt','Russia','Pakistan','Iraq','Turkey'];
       let seed=12345; function rnd(){ seed=(seed*9301+49297)%233280; return seed/233280; }
+      
+      // 7일 샘플 데이터 생성
+      const allDates = [];
+      const today = new Date();
+      for(let d=6; d>=0; d--){
+        const date = new Date(today);
+        date.setDate(date.getDate() - d);
+        allDates.push(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`);
+      }
+      
+      const trafficByDate = {};
+      allDates.forEach(date => { trafficByDate[date] = []; }); // 모든 날짜 초기화
+      
       for(let i=0;i<250;i++){
         const name = i<names.length?names[i]:`Country${i+1}`;
         countries.push(name);
         const base=500000*Math.pow(0.92,i);
         const v=base*0.1*(rnd()-0.5);
-        const r1=Math.max(1000,Math.round(base+v));
-        const r2=Math.round(r1*(1+(rnd()*0.1-0.05)));
-        const r3=Math.round(r2*(1+(rnd()*0.1-0.05)));
-        const r4=Math.round(r3*(1+(rnd()*0.1-0.05)));
-        const r5=Math.round(r4*(1+(rnd()*0.1-0.05)));
-        const r6=Math.round(r5*(1+(rnd()*0.1-0.05)));
-        const r7=Math.round(r6*(1+(rnd()*0.15-0.05)));
-        d1.push(r1); d2.push(r2); d3.push(r3); d4.push(r4); d5.push(r5); d6.push(r6); d7.push(r7);
+        let prev=Math.max(1000,Math.round(base+v));
+        
+        // 각 날짜별 트래픽 생성
+        allDates.forEach((date, idx) => {
+          if(idx === 0){
+            trafficByDate[date].push(prev);
+          } else {
+            prev = Math.round(prev*(1+(rnd()*0.1-0.05)));
+            trafficByDate[date].push(prev);
+          }
+        });
       }
-      return {Country:countries, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7, lastDate:null};
+      
+      const lastDate = allDates[allDates.length - 1];
+      return {Country:countries, allDates:allDates, trafficByDate:trafficByDate, lastDate:lastDate};
     }
 
     const sampleData = generateSampleData();
     let currentData = sampleData;
+    let rawCsvRows = null; // 원본 CSV 데이터 저장
 
     // ---------- CSV load ----------
     document.getElementById('btnLoad').addEventListener('click', ()=>{
       const f=document.getElementById('csvFile').files[0];
       if(!f){ alert('Please select a file.'); return; }
       Papa.parse(f,{header:true,skipEmptyLines:true,
-        complete:({data})=>{ const p=processData(data); if(p){ currentData=p; document.getElementById('status').textContent='CSV Loaded'; createTreemap(currentData); } },
+        complete:({data})=>{ 
+          rawCsvRows = data; // 원본 데이터 저장
+          const p=processData(data); 
+          if(p){ 
+            currentData=p; 
+            document.getElementById('status').textContent='CSV Loaded'; 
+            createTreemap(currentData); 
+          } 
+        },
         error:(e)=> alert('Error reading CSV: '+e)
       });
+    });
+    
+    // 날짜 범위 필터 적용
+    document.getElementById('btnApplyDateRange').addEventListener('click', ()=>{
+      if(!rawCsvRows || rawCsvRows.length === 0){
+        alert('Please load CSV file first.');
+        return;
+      }
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      if(!startDate || !endDate){
+        alert('Please select both start and end dates.');
+        return;
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // 종료일 포함
+      
+      if(start > end){
+        alert('Start date must be before end date.');
+        return;
+      }
+      
+      // 날짜 범위 필터링
+      const firstRow = rawCsvRows[0] || {};
+      const allKeys = Object.keys(firstRow);
+      const findColumn = (keys, possibleNames) => {
+        const lowerKeys = keys.map(k => k.toLowerCase());
+        for(const name of possibleNames){
+          const lowerName = name.toLowerCase();
+          const idx = lowerKeys.indexOf(lowerName);
+          if(idx !== -1) return keys[idx];
+        }
+        return null;
+      };
+      
+      const dateCol = findColumn(allKeys, ['Date', 'date', '날짜', 'Date']);
+      
+      if(!dateCol){
+        alert('Date column not found. Date range filter only works with Date,Country,Traffic format.');
+        return;
+      }
+      
+      // 날짜 정규화 함수
+      const normalizeDate = (dateStr) => {
+        let normalized = dateStr.toString().trim();
+        normalized = normalized.replace(/\./g, '-').replace(/\s+/g, '');
+        normalized = normalized.replace(/-+/g, '-');
+        normalized = normalized.replace(/^-+|-+$/g, '');
+        
+        const parts = normalized.split('-');
+        if(parts.length >= 3){
+          const year = parseInt(parts[0]);
+          const month = parseInt(parts[1]);
+          const day = parseInt(parts[2]);
+          if(!isNaN(year) && !isNaN(month) && !isNaN(day)){
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          }
+        }
+        return normalized;
+      };
+      
+      // 날짜 범위 내 데이터만 필터링
+      const filteredRows = rawCsvRows.filter(r => {
+        if(!r[dateCol]) return false;
+        const dateStr = normalizeDate(r[dateCol]);
+        const rowDate = new Date(dateStr);
+        if(isNaN(rowDate)) return false;
+        return rowDate >= start && rowDate <= end;
+      });
+      
+      if(filteredRows.length === 0){
+        alert('No data found in the selected date range.');
+        return;
+      }
+      
+      const p = processData(filteredRows);
+      if(p){
+        currentData = p;
+        document.getElementById('status').textContent = `CSV Loaded (${filteredRows.length} rows, ${startDate} ~ ${endDate})`;
+        createTreemap(currentData);
+      }
+    });
+    
+    // 날짜 범위 필터 초기화
+    document.getElementById('btnClearDateRange').addEventListener('click', ()=>{
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      if(rawCsvRows && rawCsvRows.length > 0){
+        const p = processData(rawCsvRows);
+        if(p){
+          currentData = p;
+          document.getElementById('status').textContent = 'CSV Loaded';
+          createTreemap(currentData);
+        }
+      }
     });
 
     function processData(rows){
       try{
-        // 형식 1: Country,Day1,Day2,Day3,Day4,Day5,Day6,Day7 (wide format)
-        if(rows[0] && rows[0].Day1 !== undefined && rows[0].Day2 !== undefined){
-          const c=[],d1=[],d2=[],d3=[],d4=[],d5=[],d6=[],d7=[];
-          rows.forEach(r=>{ 
-            if(r.Country && r.Day1 && r.Day2 && r.Day3 && r.Day4 && r.Day5 && r.Day6 && r.Day7){ 
-              c.push(r.Country); 
-              d1.push(+r.Day1); 
-              d2.push(+r.Day2); 
-              d3.push(+r.Day3); 
-              d4.push(+r.Day4); 
-              d5.push(+r.Day5); 
-              d6.push(+r.Day6); 
-              d7.push(+r.Day7); 
-            } 
-          });
-          if(!c.length){ alert('No valid data found. Check CSV format.'); return null; }
-          return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7, lastDate:null};
-        }
-        
-        // 형식 2: Date,Country,Traffic (long format) - 대소문자 구분 없이 찾기
+        // Date,Country,Traffic (long format) - 대소문자 구분 없이 찾기
+        // 날짜가 중구난방으로 있어도 나라별로 피벗하여 처리
         const firstRow = rows[0] || {};
         const allKeys = Object.keys(firstRow);
         
@@ -319,9 +444,9 @@
             }
           });
           
-          // 각 국가별로 날짜 정렬하고 최대 7일 데이터 추출
+          // 각 국가별로 날짜 정렬하고 모든 날짜 데이터 사용
           const countries = Object.keys(countryDataMap);
-          const c=[],d1=[],d2=[],d3=[],d4=[],d5=[],d6=[],d7=[];
+          const c = [];
           const allDates = new Set(); // 모든 날짜 수집
           
           countries.forEach(country => {
@@ -339,35 +464,33 @@
               return; // 이 국가는 스킵
             }
             
-            // 최대 7일까지 사용 (최신 데이터부터)
-            const selectedDates = dates.slice(-7); // 최근 7일
-            const dayCount = selectedDates.length;
-            
             c.push(country);
-            // 부족한 날짜는 0으로 채움
-            d1.push(dayCount >= 1 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount]] || 0 : 0);
-            d2.push(dayCount >= 2 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 1]] || 0 : 0);
-            d3.push(dayCount >= 3 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 2]] || 0 : 0);
-            d4.push(dayCount >= 4 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 3]] || 0 : 0);
-            d5.push(dayCount >= 5 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 4]] || 0 : 0);
-            d6.push(dayCount >= 6 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 5]] || 0 : 0);
-            d7.push(dayCount >= 7 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 6]] || 0 : 0);
           });
           
-          // 마지막 날짜 찾기
+          // 모든 날짜 정렬
           const sortedDates = Array.from(allDates).sort((a,b)=>{
             const dateA = new Date(a);
             const dateB = new Date(b);
             if(!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
             return a.localeCompare(b);
           });
+          
+          // 날짜별 트래픽 데이터 구성: trafficByDate[date][countryIndex] = traffic
+          const trafficByDate = {};
+          sortedDates.forEach(date => {
+            trafficByDate[date] = [];
+            c.forEach(country => {
+              trafficByDate[date].push(countryDataMap[country][date] || 0);
+            });
+          });
+          
           const lastDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null;
           
           if(!c.length){ alert('No valid data found. Need at least 2 days of data for each country.'); return null; }
-          return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7, lastDate:lastDate};
+          return {Country:c, allDates:sortedDates, trafficByDate:trafficByDate, lastDate:lastDate};
         }
         
-        alert('Unsupported CSV format. Use either:\n1. Country,Day1,Day2,Day3,Day4,Day5,Day6,Day7\n2. Date,Country,Traffic (or 날짜,국가,트래픽)');
+        alert('Unsupported CSV format. Required: Date,Country,Traffic (or 날짜,국가,트래픽)\n날짜는 중구난방으로 있어도 나라별로 자동 피벗하여 처리됩니다.');
         return null;
       }catch(e){ alert('Error processing data: '+e); return null; }
     }
@@ -375,30 +498,111 @@
     // ---------- Stats ----------
     function calculateStats(data){
       const total=[], change=[], lastDayTraffic=[];
-      for(let i=0;i<data.Country.length;i++){
-        const days = [data.Day1[i], data.Day2[i], data.Day3[i], data.Day4[i], data.Day5[i], data.Day6[i], data.Day7[i]];
+      const {Country, allDates, trafficByDate} = data;
+      const comparisonType = document.getElementById('comparisonType').value || 'DoD';
+      
+      // 마지막 날짜 찾기
+      const lastDate = allDates.length > 0 ? new Date(allDates[allDates.length - 1]) : null;
+      
+      for(let i=0;i<Country.length;i++){
+        // 마지막 날 트래픽
+        const lastDayValue = (lastDate && trafficByDate[allDates[allDates.length - 1]] && trafficByDate[allDates[allDates.length - 1]][i]) || 0;
+        lastDayTraffic.push(lastDayValue);
         
-        // 실제 데이터가 있는 첫 날과 마지막 날 찾기
-        let firstDay = null, lastDay = null;
-        for(let j=0; j<days.length; j++){
-          if(days[j] > 0){
-            if(firstDay === null) firstDay = days[j];
-            lastDay = days[j];
+        // 비교 기준일 찾기
+        let compareDate = null;
+        let compareValue = null;
+        
+        if(lastDate && !isNaN(lastDate)){
+          const compareDateObj = new Date(lastDate);
+          
+          switch(comparisonType){
+            case 'DoD':
+              // Day over Day: 첫 날과 마지막 날
+              if(allDates.length > 0){
+                const firstDate = new Date(allDates[0]);
+                if(!isNaN(firstDate) && trafficByDate[allDates[0]] && trafficByDate[allDates[0]][i] !== undefined){
+                  compareValue = trafficByDate[allDates[0]][i];
+                }
+              }
+              break;
+              
+            case 'WoW':
+              // Week over Week: 7일 전
+              compareDateObj.setDate(compareDateObj.getDate() - 7);
+              compareDate = `${compareDateObj.getFullYear()}-${String(compareDateObj.getMonth()+1).padStart(2,'0')}-${String(compareDateObj.getDate()).padStart(2,'0')}`;
+              // 가장 가까운 날짜 찾기 (정확히 7일 전이 없을 수 있음)
+              const wowDates = allDates.filter(d => {
+                const dObj = new Date(d);
+                const diff = Math.abs((dObj - compareDateObj) / (1000 * 60 * 60 * 24));
+                return diff <= 1; // 1일 이내 차이
+              });
+              if(wowDates.length > 0){
+                const closestDate = wowDates.sort((a,b) => {
+                  const aDiff = Math.abs((new Date(a) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  const bDiff = Math.abs((new Date(b) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  return aDiff - bDiff;
+                })[0];
+                if(trafficByDate[closestDate] && trafficByDate[closestDate][i] !== undefined){
+                  compareValue = trafficByDate[closestDate][i];
+                }
+              }
+              break;
+              
+            case 'MoM':
+              // Month over Month: 한 달 전
+              compareDateObj.setMonth(compareDateObj.getMonth() - 1);
+              compareDate = `${compareDateObj.getFullYear()}-${String(compareDateObj.getMonth()+1).padStart(2,'0')}-${String(compareDateObj.getDate()).padStart(2,'0')}`;
+              // 가장 가까운 날짜 찾기
+              const momDates = allDates.filter(d => {
+                const dObj = new Date(d);
+                const diff = Math.abs((dObj - compareDateObj) / (1000 * 60 * 60 * 24));
+                return diff <= 3; // 3일 이내 차이
+              });
+              if(momDates.length > 0){
+                const closestDate = momDates.sort((a,b) => {
+                  const aDiff = Math.abs((new Date(a) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  const bDiff = Math.abs((new Date(b) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  return aDiff - bDiff;
+                })[0];
+                if(trafficByDate[closestDate] && trafficByDate[closestDate][i] !== undefined){
+                  compareValue = trafficByDate[closestDate][i];
+                }
+              }
+              break;
+              
+            case 'YoY':
+              // Year over Year: 1년 전
+              compareDateObj.setFullYear(compareDateObj.getFullYear() - 1);
+              compareDate = `${compareDateObj.getFullYear()}-${String(compareDateObj.getMonth()+1).padStart(2,'0')}-${String(compareDateObj.getDate()).padStart(2,'0')}`;
+              // 가장 가까운 날짜 찾기
+              const yoyDates = allDates.filter(d => {
+                const dObj = new Date(d);
+                const diff = Math.abs((dObj - compareDateObj) / (1000 * 60 * 60 * 24));
+                return diff <= 7; // 7일 이내 차이
+              });
+              if(yoyDates.length > 0){
+                const closestDate = yoyDates.sort((a,b) => {
+                  const aDiff = Math.abs((new Date(a) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  const bDiff = Math.abs((new Date(b) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  return aDiff - bDiff;
+                })[0];
+                if(trafficByDate[closestDate] && trafficByDate[closestDate][i] !== undefined){
+                  compareValue = trafficByDate[closestDate][i];
+                }
+              }
+              break;
           }
         }
         
-        // Total Traffic: DoD 기준 그 다음날(마지막 날)의 총합
-        const lastDayValue = lastDay !== null ? lastDay : 0;
-        lastDayTraffic.push(lastDayValue);
-        
-        // 변화율 계산: 마지막 날 - 첫 날 (DoD: Day over Day)
-        if(firstDay !== null && lastDay !== null && firstDay > 0){
-          change.push(((lastDay - firstDay) / firstDay) * 100);
+        // 변화율 계산
+        if(compareValue !== null && compareValue > 0 && lastDayValue > 0){
+          change.push(((lastDayValue - compareValue) / compareValue) * 100);
         } else {
           change.push(0);
         }
         
-        // total은 마지막 날 트래픽으로 설정 (DoD 기준)
+        // total은 마지막 날 트래픽으로 설정
         total.push(lastDayValue);
       }
       const topN = +document.getElementById('topCount').value || 180;
@@ -450,7 +654,7 @@
 
     // ---------- Render ----------
     const overlay=document.getElementById('loadingOverlay');
-    ['topCount','sortBy','groupByContinent'].forEach(id=>{
+    ['topCount','sortBy','groupByContinent','comparisonType'].forEach(id=>{
       document.getElementById(id).addEventListener('change', ()=> createTreemap(currentData));
     });
 
@@ -468,15 +672,17 @@
           <div class="stat-item"><div class="stat-label">Max Increase</div><div class="stat-value positive">+${stats.maxChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.maxChangeCountry})</span></div></div>
           <div class="stat-item"><div class="stat-label">Max Decrease</div><div class="stat-value negative">${stats.minChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.minChangeCountry})</span></div></div>`;
         
-        // Traffic Top 10 표 제목 업데이트 (마지막 날짜 표시)
+        // Traffic Top 10 표 제목 업데이트 (마지막 날짜 표시: 연도.월.일 형식)
         const top10Title = document.getElementById('trafficTop10Title');
         if(top10Title && data.lastDate){
           const lastDateObj = new Date(data.lastDate);
           if(!isNaN(lastDateObj)){
-            const day = lastDateObj.getDate();
-            top10Title.textContent = `Traffic Top 10 (${day}일 기준)`;
+            const year = lastDateObj.getFullYear().toString().slice(-2); // 마지막 2자리
+            const month = String(lastDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(lastDateObj.getDate()).padStart(2, '0');
+            top10Title.textContent = `Traffic Top 10 (${year}.${month}.${day} 기준)`;
           } else {
-            // 날짜 파싱 실패 시 원본 날짜 문자열에서 일자 추출 시도
+            // 날짜 파싱 실패 시 원본 날짜 문자열에서 추출 시도
             const dateMatch = data.lastDate.match(/(\d{1,2})/);
             if(dateMatch){
               top10Title.textContent = `Traffic Top 10 (${dateMatch[1]}일 기준)`;
