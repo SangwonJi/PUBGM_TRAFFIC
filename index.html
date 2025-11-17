@@ -56,9 +56,8 @@
       <label><strong>Sort By:</strong>
         <select id="sortBy">
           <option value="revenue" selected>Total Traffic</option>
-          <option value="change">Change %</option>
-          <option value="change_desc">+ 변화폭 큰 순</option>
-          <option value="change_asc">- 변화폭 큰 순</option>
+          <option value="change_desc">+ 변화량 큰 순</option>
+          <option value="change_asc">- 변화량 큰 순</option>
         </select>
       </label>
       <label><input type="checkbox" id="groupByContinent" checked/> <strong>Group by Sector (Continent)</strong></label>
@@ -106,19 +105,19 @@
         </div>
       </div>
       <div id="trafficTop10" style="margin-top:20px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Traffic Top 10 (DoD 기준)</div>
+        <div id="trafficTop10Title" style="font-size:16px;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Traffic Top 10 (DoD 기준)</div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse">
             <thead>
               <tr style="border-bottom:1px solid var(--border)">
-                <th style="padding:8px;text-align:left;font-size:11px;color:var(--muted);font-weight:600">Rank</th>
-                <th style="padding:8px;text-align:left;font-size:11px;color:var(--muted);font-weight:600">Country</th>
-                <th style="padding:8px;text-align:right;font-size:11px;color:var(--muted);font-weight:600">Traffic</th>
-                <th style="padding:8px;text-align:right;font-size:11px;color:var(--muted);font-weight:600">Change</th>
+                <th style="padding:12px;text-align:left;font-size:14px;color:var(--muted);font-weight:600">Rank</th>
+                <th style="padding:12px;text-align:left;font-size:14px;color:var(--muted);font-weight:600">Country</th>
+                <th style="padding:12px;text-align:right;font-size:14px;color:var(--muted);font-weight:600">Traffic</th>
+                <th style="padding:12px;text-align:right;font-size:14px;color:var(--muted);font-weight:600">Change</th>
               </tr>
             </thead>
             <tbody id="trafficTop10Body">
-              <tr><td colspan="4" style="padding:12px;text-align:center;color:var(--muted);font-size:12px">Loading...</td></tr>
+              <tr><td colspan="4" style="padding:16px;text-align:center;color:var(--muted);font-size:14px">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -229,7 +228,7 @@
         const r7=Math.round(r6*(1+(rnd()*0.15-0.05)));
         d1.push(r1); d2.push(r2); d3.push(r3); d4.push(r4); d5.push(r5); d6.push(r6); d7.push(r7);
       }
-      return {Country:countries, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7};
+      return {Country:countries, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7, lastDate:null};
     }
 
     const sampleData = generateSampleData();
@@ -263,7 +262,7 @@
             } 
           });
           if(!c.length){ alert('No valid data found. Check CSV format.'); return null; }
-          return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7};
+          return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7, lastDate:null};
         }
         
         // 형식 2: Date,Country,Traffic (long format) - 대소문자 구분 없이 찾기
@@ -323,6 +322,7 @@
           // 각 국가별로 날짜 정렬하고 최대 7일 데이터 추출
           const countries = Object.keys(countryDataMap);
           const c=[],d1=[],d2=[],d3=[],d4=[],d5=[],d6=[],d7=[];
+          const allDates = new Set(); // 모든 날짜 수집
           
           countries.forEach(country => {
             const dates = Object.keys(countryDataMap[country]).sort((a,b)=>{
@@ -331,6 +331,8 @@
               if(!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
               return a.localeCompare(b);
             });
+            
+            dates.forEach(d => allDates.add(d));
             
             if(dates.length < 2){
               // 최소 2일 데이터 필요 (DoD 계산을 위해)
@@ -352,8 +354,17 @@
             d7.push(dayCount >= 7 ? countryDataMap[country][selectedDates[selectedDates.length - dayCount + 6]] || 0 : 0);
           });
           
+          // 마지막 날짜 찾기
+          const sortedDates = Array.from(allDates).sort((a,b)=>{
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            if(!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
+            return a.localeCompare(b);
+          });
+          const lastDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null;
+          
           if(!c.length){ alert('No valid data found. Need at least 2 days of data for each country.'); return null; }
-          return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7};
+          return {Country:c, Day1:d1, Day2:d2, Day3:d3, Day4:d4, Day5:d5, Day6:d6, Day7:d7, lastDate:lastDate};
         }
         
         alert('Unsupported CSV format. Use either:\n1. Country,Day1,Day2,Day3,Day4,Day5,Day6,Day7\n2. Date,Country,Traffic (or 날짜,국가,트래픽)');
@@ -396,20 +407,15 @@
       if(sortBy==='revenue'){
         idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> total[b]-total[a]).slice(0,topN);
       } else if(sortBy==='change_desc'){
-        // + 변화폭 큰 순 (양수 변화율만, 큰 순서대로)
+        // + 변화량 큰 순 (변화량이 큰 순서대로, 내림차순)
         idx=Array.from({length:data.Country.length},(_,i)=>i)
-          .filter(i=> change[i] > 0) // 양수만 필터링
-          .sort((a,b)=> change[b]-change[a]) // 큰 순서대로
+          .sort((a,b)=> change[b]-change[a]) // 변화량 큰 순서대로
           .slice(0,topN);
       } else if(sortBy==='change_asc'){
-        // - 변화폭 큰 순 (음수 변화율만, 하락폭 큰 순서대로)
+        // - 변화량 큰 순 (변화량이 작은 순서대로, 즉 하락폭 큰 순, 오름차순)
         idx=Array.from({length:data.Country.length},(_,i)=>i)
-          .filter(i=> change[i] < 0) // 음수만 필터링
-          .sort((a,b)=> change[a]-change[b]) // 하락폭 큰 순서대로 (음수이므로 오름차순)
+          .sort((a,b)=> change[a]-change[b]) // 변화량 작은 순서대로 (하락폭 큰 순)
           .slice(0,topN);
-      } else {
-        // change: 절대값 기준
-        idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> Math.abs(change[b])-Math.abs(change[a])).slice(0,topN);
       }
 
       const topCountries=idx.map(i=>data.Country[i]);
@@ -461,6 +467,26 @@
           <div class="stat-item"><div class="stat-label">Max Increase</div><div class="stat-value positive">+${stats.maxChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.maxChangeCountry})</span></div></div>
           <div class="stat-item"><div class="stat-label">Max Decrease</div><div class="stat-value negative">${stats.minChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.minChangeCountry})</span></div></div>`;
         
+        // Traffic Top 10 표 제목 업데이트 (마지막 날짜 표시)
+        const top10Title = document.getElementById('trafficTop10Title');
+        if(top10Title && data.lastDate){
+          const lastDateObj = new Date(data.lastDate);
+          if(!isNaN(lastDateObj)){
+            const day = lastDateObj.getDate();
+            top10Title.textContent = `Traffic Top 10 (${day}일 기준)`;
+          } else {
+            // 날짜 파싱 실패 시 원본 날짜 문자열에서 일자 추출 시도
+            const dateMatch = data.lastDate.match(/(\d{1,2})/);
+            if(dateMatch){
+              top10Title.textContent = `Traffic Top 10 (${dateMatch[1]}일 기준)`;
+            } else {
+              top10Title.textContent = 'Traffic Top 10 (DoD 기준)';
+            }
+          }
+        } else if(top10Title){
+          top10Title.textContent = 'Traffic Top 10 (DoD 기준)';
+        }
+        
         // Traffic Top 10 표 업데이트
         const top10Body = document.getElementById('trafficTop10Body');
         if(top10Body && stats.trafficTop10){
@@ -469,10 +495,10 @@
             const changeSign = item.change >= 0 ? '+' : '';
             return `
               <tr style="border-bottom:1px solid var(--border);${idx % 2 === 0 ? 'background:rgba(255,255,255,0.02)' : ''}">
-                <td style="padding:10px;font-size:13px;color:#fff;font-weight:600">${idx + 1}</td>
-                <td style="padding:10px;font-size:13px;color:#fff;font-weight:600">${item.country}</td>
-                <td style="padding:10px;text-align:right;font-size:13px;color:#fff">${(item.traffic/1e6).toFixed(2)}M</td>
-                <td style="padding:10px;text-align:right;font-size:13px;color:${changeColor};font-weight:600">${changeSign}${item.change.toFixed(2)}%</td>
+                <td style="padding:14px;font-size:16px;color:#fff;font-weight:600">${idx + 1}</td>
+                <td style="padding:14px;font-size:16px;color:#fff;font-weight:600">${item.country}</td>
+                <td style="padding:14px;text-align:right;font-size:16px;color:#fff">${(item.traffic/1e6).toFixed(2)}M</td>
+                <td style="padding:14px;text-align:right;font-size:16px;color:${changeColor};font-weight:600">${changeSign}${item.change.toFixed(2)}%</td>
               </tr>
             `;
           }).join('');
