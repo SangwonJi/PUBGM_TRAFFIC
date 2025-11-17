@@ -430,7 +430,8 @@
             const total=g.v.reduce((a,b)=>a+b,0);
             const contId=`continent:${cont}`;
             // 대륙 텍스트 크게 (볼드체) - Finviz 스타일
-            ids.push(contId); labels.push(cont); parents.push(''); values.push(total); colors.push('#262931'); text.push(`<b style="font-size:86.4px;font-weight:900;letter-spacing:2px;color:#FFFFFF">${cont}</b>`); custom.push([null,null,cont]);
+            const continentTextShadow = 'text-shadow: 2px 2px 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8);';
+            ids.push(contId); labels.push(cont); parents.push(''); values.push(total); colors.push('#262931'); text.push(`<b style="font-size:86.4px;font-weight:900;letter-spacing:2px;color:#FFFFFF;${continentTextShadow}">${cont}</b>`); custom.push([null,null,cont]);
 
             // thresholds for label density by share
             const small=0.010, medium=0.025;
