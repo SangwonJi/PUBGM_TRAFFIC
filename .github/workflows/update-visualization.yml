@@ -1,0 +1,72 @@
+name: Update Visualization
+
+on:
+  schedule:
+    # 매일 한국시간 오전 9시 (UTC 00:00)에 실행
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # 수동 실행 가능
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'data/**'
+      - 'index.html'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install pandas matplotlib squarify numpy
+      
+      - name: Check if data update script exists
+        id: check_script
+        run: |
+          if [ -f "update_data.py" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run data update script (if exists)
+        if: steps.check_script.outputs.exists == 'true'
+        run: |
+          python update_data.py
+      
+      - name: Commit and push changes
+        if: steps.check_script.outputs.exists == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git diff --staged --quiet || git commit -m "Auto-update visualization data [skip ci]"
+          git push
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          exclude_assets: |
+            .git
+            .github
+            *.py
+            *.md
+            .gitignore
+            requirements.txt
+            pubgm_review_automation.py
+            *.ini

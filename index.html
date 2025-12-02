@@ -1,0 +1,2831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Traffic by Country — Finviz-style Treemap</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- API 설정 파일 (선택사항, 로컬 개발용) -->
+    <script>
+      // config.js가 있으면 로드, 없으면 무시 (404 에러 방지)
+      // GitHub Pages에서는 config.js가 없으므로 에러가 발생하지만 기능에는 영향 없음
+    </script>
+    <style>
+    :root{
+      --bg:#262931; --panel:#161b22; --muted:#8b949e; --border:#30363d; --tile-gap:#262931; /* 배경 색상 */
+      --green-weak:#39D353; --green-mid:#00C853; --green-strong:#00E676; --green-max:#00FF00;
+      --red-weak:#FF6E6E; --red-mid:#FF3B3B; --red-strong:#FF1A1A; --red-max:#FF0000;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(135deg,var(--bg),#161b22);color:#fff;min-height:100vh}
+    .container{width:100%;max-width:100%;margin:0 auto;background:var(--bg)}
+    .header{background:linear-gradient(135deg,#161b22,#1c2128);border-bottom:1px solid var(--border);padding:18px 40px}
+    .header h1{font-size:20px;font-weight:700;letter-spacing:-.2px}
+    .header p{font-size:12px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:8px}
+    .toolbar,.filter-controls{padding:14px 40px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .toolbar input[type="file"], .filter-controls input[type="number"], .filter-controls select{padding:8px 12px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px}
+    .toolbar button{padding:8px 14px;background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer}
+    .status-badge{background:linear-gradient(135deg,#238636,#2ea043);padding:6px 10px;border-radius:6px;font-size:12px}
+    .content{padding:24px 40px}
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+    .stat-item{background:linear-gradient(135deg,#161b22,#1c2128);border:1px solid var(--border);border-radius:8px;padding:14px}
+    .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+    .stat-value{font-size:22px;font-weight:700}
+    .stat-value.positive{color:#00ff00}
+    .stat-value.negative{color:#ff4d4d}
+    #treemap{width:100%;min-height:calc(100vh - 300px);background:var(--tile-gap);border:1px solid var(--border);border-radius:8px;position:relative;overflow:hidden}
+    .loading-overlay{position:absolute;inset:0;background:rgba(13,17,23,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000}
+    .loading-spinner{border:4px solid var(--border);border-top:4px solid #238636;border-radius:50%;width:46px;height:46px;animation:spin 1s linear infinite;margin-bottom:12px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .badge{display:inline-flex;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:linear-gradient(135deg,#161b22,#1c2128);font-size:12px}
+    .badge[data-tip]{position:relative}
+    .badge[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 10px);white-space:nowrap;background:#161b22;color:#fff;padding:8px 10px;border-radius:8px;border:1px solid var(--border)}
+    .tabs-container{background:var(--panel);border-bottom:1px solid var(--border);padding:0 40px}
+    .tabs{display:flex;gap:0;overflow-x:auto}
+    .tab-button{padding:14px 24px;background:transparent;border:none;border-bottom:3px solid transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all 0.2s}
+    .tab-button:hover{color:#fff;background:rgba(255,255,255,0.05)}
+    .tab-button.active{color:#fff;border-bottom-color:#238636;background:rgba(35,134,54,0.1)}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+    .risers-fallers-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
+    .risers-section,.fallers-section{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px}
+    .section-title{font-size:16px;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+    .country-list{max-height:600px;overflow-y:auto}
+    .country-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border);transition:background 0.2s}
+    .country-item:hover{background:rgba(255,255,255,0.05)}
+    .country-item:last-child{border-bottom:none}
+    .country-name{font-size:14px;font-weight:600;color:#fff}
+    .country-change{font-size:14px;font-weight:600}
+    .country-change.positive{color:#00ff00}
+    .country-change.negative{color:#ff4d4d}
+    .country-detail-container{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:20px}
+    .country-select-wrapper{margin-bottom:20px}
+    .country-select-wrapper select{width:100%;padding:10px 12px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px;font-size:14px}
+    .country-search-wrapper{position:relative;margin-bottom:20px}
+    .country-search-input{width:100%;padding:12px 40px 12px 16px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px;font-size:14px}
+    .country-search-input:focus{outline:none;border-color:#238636}
+    .country-search-icon{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+    .country-autocomplete{position:absolute;top:100%;left:0;right:0;background:var(--panel);border:1px solid var(--border);border-radius:6px;max-height:300px;overflow-y:auto;z-index:1000;margin-top:4px;display:none}
+    .country-autocomplete-item{padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.2s}
+    .country-autocomplete-item:hover{background:rgba(255,255,255,0.05)}
+    .country-autocomplete-item:last-child{border-bottom:none}
+    .country-autocomplete-item.highlight{background:rgba(35,134,54,0.2);border-left:3px solid #238636}
+    .quick-select-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:20px}
+    .quick-select-btn{padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:#fff;font-size:13px;cursor:pointer;transition:all 0.2s;text-align:center}
+    .quick-select-btn:hover{background:rgba(35,134,54,0.2);border-color:#238636}
+    .quick-select-section{margin-bottom:20px}
+    .quick-select-title{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;font-weight:600}
+    .country-detail-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+    .detail-stat-item{background:linear-gradient(135deg,#161b22,#1c2128);border:1px solid var(--border);border-radius:8px;padding:16px}
+    .detail-stat-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+    .detail-stat-value{font-size:24px;font-weight:700;color:#fff}
+    .traffic-chart-container{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:20px;min-height:400px}
+    .news-container{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:24px}
+    .news-item{display:flex;gap:16px;padding:20px;border-bottom:1px solid var(--border);transition:background 0.2s}
+    .news-item:hover{background:rgba(255,255,255,0.05)}
+    .news-item:last-child{border-bottom:none}
+    .news-content{flex:1}
+    .news-title{font-size:17px;font-weight:600;color:#fff;margin-bottom:10px;line-height:1.4}
+    .news-title a{color:#fff;text-decoration:none}
+    .news-title a:hover{color:#238636}
+    .news-meta{font-size:13px;color:var(--muted);display:flex;gap:12px;align-items:center}
+    .news-source{color:#238636;font-weight:600}
+    .news-date{color:var(--muted)}
+    .news-snippet{font-size:15px;color:var(--muted);margin-top:10px;line-height:1.6}
+    .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+    .empty-state-icon{font-size:48px;margin-bottom:16px;opacity:0.5}
+    @media (max-width:768px){.header{padding:14px 16px}.content{padding:12px 16px}.filter-controls{padding:14px 16px}.tabs-container{padding:0 16px}.risers-fallers-grid{grid-template-columns:1fr}.tabs{overflow-x:auto}.tab-button{padding:12px 16px;font-size:13px}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+      <h1>🥸 PUBGM 글로벌 추이</h1>
+        </div>
+        
+        <div class="toolbar">
+      <input type="file" id="csvFile" accept=".csv"/>
+      <button id="btnLoad">📁 Load CSV</button>
+      <div class="status-badge" id="status">Sample Data (250 Countries)</div>
+    </div>
+
+    <div class="tabs-container">
+      <div class="tabs">
+        <button class="tab-button active" data-tab="treemap">📊 Treemap</button>
+        <button class="tab-button" data-tab="risers-fallers">📈 Risers/Fallers</button>
+        <button class="tab-button" data-tab="country-detail">🌍 Country Detail</button>
+        <button class="tab-button" data-tab="news">📰 News & Headlines</button>
+      </div>
+    </div>
+
+    <div class="filter-controls" id="treemapFilters">
+      <label><strong>Show Top:</strong> <input type="number" id="topCount" value="180" min="10" max="250"/></label>
+      <label><strong>Sort By:</strong>
+        <select id="sortBy">
+          <option value="revenue" selected>Total Traffic</option>
+          <option value="change_desc">+ 변화량 큰 순</option>
+          <option value="change_asc">- 변화량 큰 순</option>
+        </select>
+      </label>
+      <!-- Group by Continent는 항상 활성화 (숨김 처리) -->
+      <input type="checkbox" id="groupByContinent" checked style="display:none"/>
+      <label style="margin-top:8px"><strong>Comparison:</strong>
+        <select id="comparisonType" style="padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px;margin-left:8px;font-size:13px">
+          <option value="DoD" selected>DoD (전일 대비)</option>
+          <option value="WoW">WoW (주간 합계)</option>
+          <option value="MoM">MoM (월간 합계)</option>
+          <option value="QoQ">QoQ (분기 합계)</option>
+          <option value="YoY">YoY (전년 동일)</option>
+          <option value="Period">Period (기간 전체)</option>
+        </select>
+        <span id="comparisonInfo" style="margin-left:8px;font-size:11px;color:var(--muted)"></span>
+      </label>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
+        <label><strong>Date Range:</strong></label>
+        <input type="date" id="startDate" style="padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px"/>
+        <span style="color:var(--muted)">~</span>
+        <input type="date" id="endDate" style="padding:6px 10px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px"/>
+        <button id="btnApplyDateRange" style="padding:6px 12px;background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:12px">Apply</button>
+        <button id="btnClearDateRange" style="padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:#fff;font-weight:600;cursor:pointer;font-size:12px">Clear</button>
+        <span id="dateRangeIndicator" style="display:none;margin-left:8px;padding:6px 12px;background:rgba(35,134,54,0.15);border:1px solid rgba(35,134,54,0.3);border-radius:6px;font-size:12px;color:#2ed573">
+          📅 <span id="dateRangeText"></span>
+        </span>
+      </div>
+        </div>
+        
+        <div class="content">
+      <!-- Treemap Tab -->
+      <div class="tab-content active" id="tab-treemap">
+        <!-- 데이터 기준 정보 표시 -->
+        <div id="dataContextInfo" style="display:none;margin-bottom:16px;padding:14px 20px;background:linear-gradient(135deg,rgba(35,134,54,0.1),rgba(83,82,237,0.1));border:1px solid rgba(35,134,54,0.3);border-radius:10px">
+          <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:18px">📅</span>
+              <div>
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">데이터 기간</div>
+                <div id="dataContextPeriod" style="font-size:14px;color:#fff;font-weight:600">-</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:18px">📊</span>
+              <div>
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">변화율 기준</div>
+                <div id="dataContextComparison" style="font-size:14px;color:#fff;font-weight:600">-</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:18px">📁</span>
+              <div>
+                <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">데이터 수</div>
+                <div id="dataContextRows" style="font-size:14px;color:#fff;font-weight:600">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="stats-grid" id="stats"></div>
+        <div id="treemap">
+          <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" style="color:var(--muted)">데이터를 생성하고 있습니다...</div>
+          </div>
+        </div>
+        <div class="color-palette" style="margin-top:20px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Color Palette</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+              <div style="width:24px;height:24px;background:#f63538;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+              <span style="color:#fff;font-size:13px;font-weight:600">-3%</span>
+            </div>
+            <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+              <div style="width:24px;height:24px;background:#bf4045;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+              <span style="color:#fff;font-size:13px;font-weight:600">-2%</span>
+            </div>
+            <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+              <div style="width:24px;height:24px;background:#8b444e;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+              <span style="color:#fff;font-size:13px;font-weight:600">-1%</span>
+            </div>
+            <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+              <div style="width:24px;height:24px;background:#414554;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+              <span style="color:#fff;font-size:13px;font-weight:600">0%</span>
+            </div>
+            <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+              <div style="width:24px;height:24px;background:#3e7c55;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+              <span style="color:#fff;font-size:13px;font-weight:600">+1%</span>
+            </div>
+            <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+              <div style="width:24px;height:24px;background:#2f9e4f;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+              <span style="color:#fff;font-size:13px;font-weight:600">+2%</span>
+            </div>
+            <div class="palette-item" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+              <div style="width:24px;height:24px;background:#30cc5a;border-radius:4px;border:1px solid rgba(255,255,255,0.1)"></div>
+              <span style="color:#fff;font-size:13px;font-weight:600">+3%</span>
+            </div>
+          </div>
+        </div>
+        <div id="trafficTop10" style="margin-top:20px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px">
+          <div id="trafficTop10Title" style="font-size:16px;color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Traffic Top 10 (DoD 기준)</div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border)">
+                  <th style="padding:12px;text-align:left;font-size:14px;color:var(--muted);font-weight:600">Rank</th>
+                  <th style="padding:12px;text-align:left;font-size:14px;color:var(--muted);font-weight:600">Country</th>
+                  <th style="padding:12px;text-align:right;font-size:14px;color:var(--muted);font-weight:600">Traffic</th>
+                  <th style="padding:12px;text-align:right;font-size:14px;color:var(--muted);font-weight:600">Change</th>
+                </tr>
+              </thead>
+              <tbody id="trafficTop10Body">
+                <tr><td colspan="4" style="padding:16px;text-align:center;color:var(--muted);font-size:14px">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risers/Fallers Tab -->
+      <div class="tab-content" id="tab-risers-fallers">
+        <div style="margin-bottom:20px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px">
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:8px">
+              <strong style="color:var(--muted);font-size:14px">최소 트래픽 필터:</strong>
+              <input type="number" id="risersFallersTrafficFilter" value="50000" min="0" step="1000" style="padding:8px 12px;border:1px solid var(--border);background:var(--bg);color:#fff;border-radius:6px;width:120px;font-size:14px"/>
+              <span style="color:var(--muted);font-size:13px">이상</span>
+            </label>
+            <div style="font-size:12px;color:var(--muted);padding:8px 12px;background:rgba(35,134,54,0.1);border:1px solid rgba(35,134,54,0.3);border-radius:6px">
+              💡 5% 이상 변화 + 트래픽 필터 조건을 만족하는 국가만 표시됩니다
+            </div>
+          </div>
+        </div>
+        <div class="risers-fallers-grid">
+          <div class="risers-section">
+            <div class="section-title" id="risersTitle" style="color:#00ff00">📈 Risers (5% 이상 상승)</div>
+            <div class="country-list" id="risersList">
+              <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <div>데이터를 로드하는 중...</div>
+              </div>
+            </div>
+          </div>
+          <div class="fallers-section">
+            <div class="section-title" id="fallersTitle" style="color:#ff4d4d">📉 Fallers (5% 이상 하락)</div>
+            <div class="country-list" id="fallersList">
+              <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <div>데이터를 로드하는 중...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Country Detail Tab -->
+      <div class="tab-content" id="tab-country-detail">
+        <div class="country-detail-container">
+          <!-- 빠른 선택: Top 10 국가 -->
+          <div class="quick-select-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+              <div class="quick-select-title" style="margin-bottom:0">🚀 빠른 선택 (Traffic Top 10)</div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <span id="top10DateInfo" style="font-size:12px;color:var(--muted)"></span>
+                <div style="display:flex;background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+                  <button id="top10LastDay" class="top10-mode-btn active" onclick="setTop10Mode('lastDay')" style="padding:6px 12px;font-size:12px;border:none;background:var(--accent);color:white;cursor:pointer;transition:all 0.2s">마지막 일</button>
+                  <button id="top10Cumulative" class="top10-mode-btn" onclick="setTop10Mode('cumulative')" style="padding:6px 12px;font-size:12px;border:none;background:transparent;color:var(--text);cursor:pointer;transition:all 0.2s">기간 누적</button>
+                </div>
+              </div>
+            </div>
+            <div class="quick-select-grid" id="quickSelectTop10"></div>
+          </div>
+          
+          <!-- 검색 기능 -->
+          <div class="country-search-wrapper">
+            <input type="text" id="countrySearch" class="country-search-input" placeholder="🔍 국가명 검색 (예: USA, China, Korea...)"/>
+            <div class="country-search-icon">🔍</div>
+            <div class="country-autocomplete" id="countryAutocomplete"></div>
+          </div>
+          
+          <!-- 드롭다운 (기존 방식, 숨김 처리) -->
+          <div class="country-select-wrapper" style="display:none">
+            <label style="display:block;margin-bottom:8px;color:var(--muted);font-size:14px;font-weight:600">국가 선택:</label>
+            <select id="countrySelect">
+              <option value="">국가를 선택하세요...</option>
+            </select>
+          </div>
+          
+          <div id="countryDetailContent" style="display:none">
+            <div class="country-detail-stats" id="countryDetailStats"></div>
+            <div class="traffic-chart-container">
+              <div id="countryTrafficChart" style="min-height:400px"></div>
+            </div>
+          </div>
+          <div id="countryDetailEmpty" class="empty-state">
+            <div class="empty-state-icon">🌍</div>
+            <div>국가를 검색하거나 빠른 선택 버튼을 클릭하세요.</div>
+            <div style="margin-top:8px;font-size:12px;color:var(--muted)">💡 Treemap이나 Risers/Fallers에서 국가를 클릭해도 자동으로 이동합니다.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- News & Headlines Tab -->
+      <div class="tab-content" id="tab-news">
+        <div class="news-container">
+          <div style="margin-bottom:20px">
+            <div class="section-title" style="margin:0">📰 News & Headlines</div>
+          </div>
+          
+          <!-- 🔥 트래픽 영향 요약 섹션 (AI 분석) -->
+          <div id="trafficSummarySection" style="margin-bottom:24px;padding:20px;background:linear-gradient(135deg, rgba(255,107,107,0.1), rgba(83,82,237,0.1));border:1px solid rgba(255,107,107,0.3);border-radius:12px">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+              <div style="width:40px;height:40px;background:linear-gradient(135deg,#ff6b6b,#ee5a24);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px">📊</div>
+              <div>
+                <div style="font-size:16px;font-weight:700;color:#fff">트래픽 영향 분석</div>
+                <div style="font-size:12px;color:var(--muted)">최근 24시간 수집 뉴스 기반</div>
+              </div>
+            </div>
+            <div id="trafficSummaryContent" style="font-size:14px;line-height:1.8;color:#e0e0e0">
+              <div style="display:flex;align-items:center;gap:8px;color:var(--muted)">
+                <div class="loading-spinner" style="width:16px;height:16px;border-width:2px"></div>
+                분석 중...
+              </div>
+            </div>
+            <div id="trafficSummaryMeta" style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.1);display:none">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
+                <span>🕐 분석 시간: <span id="summaryTime">-</span></span>
+                <span>📰 분석 뉴스: <span id="summaryNewsCount">0</span>개</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 뉴스 필터 카드 -->
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+            <button class="news-type-filter active" data-type="all" style="padding:16px;background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:12px;color:#fff;cursor:pointer;transition:all 0.2s;text-align:left">
+              <div style="font-size:24px;margin-bottom:8px">📰</div>
+              <div style="font-size:14px;font-weight:700">전체 뉴스</div>
+              <div style="font-size:12px;opacity:0.8;margin-top:4px"><span id="totalNewsCount">0</span>개</div>
+            </button>
+            <button class="news-type-filter" data-type="traffic_impact" style="padding:16px;background:var(--panel);border:2px solid #ff6b6b;border-radius:12px;color:#ff6b6b;cursor:pointer;transition:all 0.2s;text-align:left">
+              <div style="font-size:24px;margin-bottom:8px">⚡</div>
+              <div style="font-size:14px;font-weight:700">트래픽 영향</div>
+              <div style="font-size:12px;opacity:0.8;margin-top:4px"><span id="trafficNewsCount">0</span>개</div>
+            </button>
+            <button class="news-type-filter" data-type="gaming" style="padding:16px;background:var(--panel);border:2px solid #5352ed;border-radius:12px;color:#5352ed;cursor:pointer;transition:all 0.2s;text-align:left">
+              <div style="font-size:24px;margin-bottom:8px">🎮</div>
+              <div style="font-size:14px;font-weight:700">게임 뉴스</div>
+              <div style="font-size:12px;opacity:0.8;margin-top:4px"><span id="gamingNewsCount">0</span>개</div>
+            </button>
+          </div>
+          
+          <!-- 세부 카테고리 필터 (접이식) -->
+          <div style="margin-bottom:20px">
+            <button id="toggleCategoryFilter" style="width:100%;padding:12px 16px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:13px">
+              <span>🏷️ 세부 카테고리 필터</span>
+              <span id="categoryToggleIcon">▼</span>
+            </button>
+            <div id="categoryFilterSection" style="margin-top:12px;padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px;display:none">
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">
+                <button class="category-filter active" data-category="all" style="padding:10px 12px;background:linear-gradient(135deg,#238636,#2ea043);border:none;border-radius:8px;color:#fff;font-size:12px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px">
+                  <span>✓</span> 전체 보기
+                </button>
+                <button class="category-filter" data-category="outage_block" style="padding:10px 12px;background:rgba(255,71,87,0.1);border:2px solid #ff4757;border-radius:8px;color:#ff4757;font-size:12px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px">
+                  <span>🔴</span> 장애/차단
+                </button>
+                <button class="category-filter" data-category="social_crisis" style="padding:10px 12px;background:rgba(255,165,2,0.1);border:2px solid #ffa502;border-radius:8px;color:#ffa502;font-size:12px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px">
+                  <span>🟠</span> 사회 위기
+                </button>
+                <button class="category-filter" data-category="seasonal_calendar" style="padding:10px 12px;background:rgba(46,213,115,0.1);border:2px solid #2ed573;border-radius:8px;color:#2ed573;font-size:12px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px">
+                  <span>🟢</span> 시즌/일정
+                </button>
+                <button class="category-filter" data-category="gaming_competitor" style="padding:10px 12px;background:rgba(83,82,237,0.1);border:2px solid #5352ed;border-radius:8px;color:#5352ed;font-size:12px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px">
+                  <span>🔵</span> 게임/경쟁
+                </button>
+                <button class="category-filter" data-category="other" style="padding:10px 12px;background:rgba(149,165,166,0.1);border:2px solid #95a5a6;border-radius:8px;color:#95a5a6;font-size:12px;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:6px">
+                  <span>⚪</span> 기타
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div id="newsList">
+            <div class="empty-state">
+              <div class="empty-state-icon">📰</div>
+              <div>뉴스를 불러오는 중...</div>
+              <div style="margin-top:12px;font-size:12px;color:var(--muted)">CSV 파일에서 뉴스를 로드합니다.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+        </div>
+        
+    <div class="footer" style="padding:14px;background:var(--panel);border-top:1px solid var(--border);color:var(--muted);text-align:center;font-size:12px">
+      📊 CSV Format: Date,Country,Traffic (날짜는 중구난방 가능, 나라별 자동 피벗) · Hover tiles for details
+        </div>
+    </div>
+
+    <script>
+    // ---------- Mapping: Country → Continent (Sector) ----------
+    const countryToContinent = {
+      'USA':'NORTH AMERICA','Canada':'NORTH AMERICA','Mexico':'NORTH AMERICA','Guatemala':'NORTH AMERICA','Honduras':'NORTH AMERICA','El Salvador':'NORTH AMERICA','Nicaragua':'NORTH AMERICA','Costa Rica':'NORTH AMERICA','Panama':'NORTH AMERICA','Cuba':'NORTH AMERICA','Jamaica':'NORTH AMERICA','Haiti':'NORTH AMERICA','Dominican Republic':'NORTH AMERICA','Trinidad':'NORTH AMERICA','Barbados':'NORTH AMERICA','Bahamas':'NORTH AMERICA','Belize':'NORTH AMERICA',
+      'Brazil':'SOUTH AMERICA','Argentina':'SOUTH AMERICA','Chile':'SOUTH AMERICA','Colombia':'SOUTH AMERICA','Peru':'SOUTH AMERICA','Ecuador':'SOUTH AMERICA','Venezuela':'SOUTH AMERICA','Uruguay':'SOUTH AMERICA','Paraguay':'SOUTH AMERICA','Bolivia':'SOUTH AMERICA','Suriname':'SOUTH AMERICA','Guyana':'SOUTH AMERICA','French Guiana':'SOUTH AMERICA',
+      'Germany':'EUROPE','UK':'EUROPE','France':'EUROPE','Italy':'EUROPE','Spain':'EUROPE','Netherlands':'EUROPE','Poland':'EUROPE','Belgium':'EUROPE','Sweden':'EUROPE','Switzerland':'EUROPE','Greece':'EUROPE','Portugal':'EUROPE','Czech Republic':'EUROPE','Romania':'EUROPE','Hungary':'EUROPE','Bulgaria':'EUROPE','Croatia':'EUROPE','Serbia':'EUROPE','Slovakia':'EUROPE','Slovenia':'EUROPE','Austria':'EUROPE','Denmark':'EUROPE','Norway':'EUROPE','Finland':'EUROPE','Ireland':'EUROPE','Cyprus':'EUROPE','Albania':'EUROPE','Bosnia':'EUROPE','Macedonia':'EUROPE','Montenegro':'EUROPE','Kosovo':'EUROPE','Iceland':'EUROPE','Luxembourg':'EUROPE','Malta':'EUROPE','Monaco':'EUROPE','Andorra':'EUROPE','Liechtenstein':'EUROPE','San Marino':'EUROPE','Vatican':'EUROPE','Jersey':'EUROPE','Guernsey':'EUROPE','Isle of Man':'EUROPE','Faroe Islands':'EUROPE','Greenland':'EUROPE','Svalbard':'EUROPE','Ukraine':'EUROPE','Lithuania':'EUROPE','Latvia':'EUROPE','Estonia':'EUROPE','Moldova':'EUROPE','Belarus':'EUROPE',
+      'China':'ASIA','India':'ASIA','Japan':'ASIA','Korea':'ASIA','South Korea':'ASIA','Indonesia':'ASIA','Thailand':'ASIA','Vietnam':'ASIA','Philippines':'ASIA','Malaysia':'ASIA','Singapore':'ASIA','Pakistan':'ASIA','Bangladesh':'ASIA','Myanmar':'ASIA','Cambodia':'ASIA','Laos':'ASIA','Nepal':'ASIA','Sri Lanka':'ASIA','Afghanistan':'ASIA','Iraq':'ASIA','Iran':'ASIA','Israel':'ASIA','Jordan':'ASIA','Lebanon':'ASIA','Kuwait':'ASIA','Qatar':'ASIA','Oman':'ASIA','Bahrain':'ASIA','Yemen':'ASIA','Syria':'ASIA','Saudi Arabia':'ASIA','UAE':'ASIA','Turkey':'ASIA','Kazakhstan':'ASIA','Uzbekistan':'ASIA','Kyrgyzstan':'ASIA','Tajikistan':'ASIA','Turkmenistan':'ASIA','Azerbaijan':'ASIA','Armenia':'ASIA','Georgia':'ASIA','Mongolia':'ASIA','North Korea':'ASIA','Taiwan':'ASIA','Hong Kong':'ASIA','Macau':'ASIA','Brunei':'ASIA','East Timor':'ASIA','Bhutan':'ASIA','Maldives':'ASIA',
+      'South Africa':'AFRICA','Egypt':'AFRICA','Nigeria':'AFRICA','Morocco':'AFRICA','Algeria':'AFRICA','Tunisia':'AFRICA','Libya':'AFRICA','Sudan':'AFRICA','Ethiopia':'AFRICA','Kenya':'AFRICA','Tanzania':'AFRICA','Uganda':'AFRICA','Ghana':'AFRICA','Ivory Coast':'AFRICA','Senegal':'AFRICA','Cameroon':'AFRICA','Angola':'AFRICA','Mozambique':'AFRICA','Madagascar':'AFRICA','Zimbabwe':'AFRICA','Zambia':'AFRICA','Malawi':'AFRICA','Rwanda':'AFRICA','Burundi':'AFRICA','Somalia':'AFRICA','Djibouti':'AFRICA','Eritrea':'AFRICA','Mauritania':'AFRICA','Mali':'AFRICA','Burkina Faso':'AFRICA','Niger':'AFRICA','Chad':'AFRICA','Central African Republic':'AFRICA','Congo':'AFRICA','DR Congo':'AFRICA','Gabon':'AFRICA','Equatorial Guinea':'AFRICA','Sao Tome':'AFRICA','Guinea':'AFRICA','Sierra Leone':'AFRICA','Liberia':'AFRICA','Togo':'AFRICA','Benin':'AFRICA','Mauritius':'AFRICA','Seychelles':'AFRICA','Comoros':'AFRICA','Cape Verde':'AFRICA','Guinea-Bissau':'AFRICA','Gambia':'AFRICA','Lesotho':'AFRICA','Swaziland':'AFRICA','Botswana':'AFRICA','Namibia':'AFRICA',
+      'Australia':'OCEANIA','New Zealand':'OCEANIA','Papua New Guinea':'OCEANIA','Fiji':'OCEANIA','Solomon Islands':'OCEANIA','Vanuatu':'OCEANIA','Samoa':'OCEANIA','Tonga':'OCEANIA','Palau':'OCEANIA','Micronesia':'OCEANIA','Marshall Islands':'OCEANIA','Norfolk Island':'OCEANIA','Christmas Island':'OCEANIA','Cocos Islands':'OCEANIA',
+      'Russia':'RUSSIA & CIS'
+    };
+
+    const getContinent = (c)=> countryToContinent[c] || 'OTHER';
+
+    // ---------- 새로운 색상 팔레트 (변화량에 따라 보간) ----------
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+    
+    function rgbToHex(r, g, b) {
+      return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    
+    function interpolateColor(color1, color2, factor) {
+      const rgb1 = hexToRgb(color1);
+      const rgb2 = hexToRgb(color2);
+      if (!rgb1 || !rgb2) return color1;
+      
+      const r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * factor);
+      const g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * factor);
+      const b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * factor);
+      
+      return rgbToHex(r, g, b);
+    }
+    
+    function colorFromChange(change, intensity = 1) {
+      // 색상 정의
+      const colors = {
+        pos3: '#30cc5a',  // +3%
+        pos2: '#2f9e4f',  // +2%
+        pos1: '#3e7c55',  // +1%
+        zero: '#414554',  // 0%
+        neg1: '#8b444e',  // -1%
+        neg2: '#bf4045',  // -2%
+        neg3: '#f63538'   // -3%
+      };
+      
+      // 변화율에 따라 색상 보간
+      if (change >= 3) {
+        return colors.pos3;
+      } else if (change >= 2) {
+        const factor = (change - 2) / 1; // 2~3 사이의 비율
+        return interpolateColor(colors.pos2, colors.pos3, factor);
+      } else if (change >= 1) {
+        const factor = (change - 1) / 1; // 1~2 사이의 비율
+        return interpolateColor(colors.pos1, colors.pos2, factor);
+      } else if (change > 0) {
+        const factor = change / 1; // 0~1 사이의 비율
+        return interpolateColor(colors.zero, colors.pos1, factor);
+      } else if (change === 0 || (change > -0.5 && change < 0.5)) {
+        return colors.zero;
+      } else if (change > -1) {
+        const factor = Math.abs(change) / 1; // 0~1 사이의 비율
+        return interpolateColor(colors.zero, colors.neg1, factor);
+      } else if (change > -2) {
+        const factor = (Math.abs(change) - 1) / 1; // 1~2 사이의 비율
+        return interpolateColor(colors.neg1, colors.neg2, factor);
+      } else if (change > -3) {
+        const factor = (Math.abs(change) - 2) / 1; // 2~3 사이의 비율
+        return interpolateColor(colors.neg2, colors.neg3, factor);
+      } else {
+        return colors.neg3;
+      }
+    }
+
+    // ---------- Sample data ----------
+    function generateSampleData(){
+      const countries = [];
+      const names=['Vatican','Saint Pierre and Miquelon','Montserrat','福克兰群岛','San Marino','Isle of Man','Niue','Cuba','Faroe Islands','Dutch Caribbean','Jersey','Bermuda','Sao Tome and Principe','Gibraltar','Andorra','Liechtenstein','Guinea-Bissau','Turks and Caicos Islands','Saint Martin','Sint Maarten','Anguilla','Central Africa','Equatorial Guinea','根西岛','Aruba','Burundi','United States Virgin Islands','Saint Kitts and Nevis','Nauru','Bahamas','Cayman Islands','Lesotho','Northern Mariana Islands','Cape Verde','Guadeloupe','Palau','Antigua and Barbuda','Swaziland','Monaco','other','Martinique','Iceland','Cook Islands','Reunion','Liberia','New Caledonia','Gambia','Sierra Leone','Guinea','EU','French Guiana','Rwanda','Grenada','Togo','Greenland','Benin','Haiti','Angola','South Sudan','Mozambique','Saint Vincent and the Grenadines','Macao','Malta','Namibia','Burkina Faso','Gabon','Barbados','Guam','Seychelles','Djibouti','Marshall Islands','Mali','Cameroon','Belize','Botswana','Trinidad and Tobago','Zimbabwe','Niger','Estonia','Malawi','Papua New Guinea','Puerto Rico','Fiji Islands','Zambia','Panama','Côte dIvoire','Senegal','Federated States of Micronesia','Luxembourg','Costa Rica','Slovenia','Ghana','Nicaragua','Bolivia','El Salvador','Paraguay','Uganda','Curacao','Uruguay','Korea','French Polynesia','Japan','Latvia','Honduras','Ireland','Surinam','Tonga','Solomon Islands','Montenegro','Denmark','Portugal','Dominica','Norway','Brunei','Croatia','Cyprus','Tunisia','Slovakia','Lithuania','Guatemala','Jamaica','Macedonia','Laos','new Zealand','Ecuador','Maldives','Venezuela','Peru','Tanzania','Chad','Guyana','Finland','Mauritania','Nigeria','Switzerland','Madagascar','China','Belgium','Bosnia and Herzegovina','Bahrain','Austria','East Timor','Albania','Bhutan','Colombia','Chile','Greece','Hungary','Sweden','Czech','Argentina','Tajikistan','Serbia','Sri Lanka','Spain','Moldova','Kenya','Poland','Ethiopia','Italy','Sudan','Australia','Mauritius','Armenia','South Africa','Kuwait','Oman','Qatar','Cambodia','Bulgaria','Iran','Morocco','Kyrgyzstan','Mongolia','Canada','Romania','Georgia','Belarus','Netherlands','Taiwan','Somalia','Israel','Turkmenistan','Mexico','Singapore','Kazakhstan','Brazil','Syria','United Arab Emirates','Palestine','United Kingdom','Afghanistan','Jordan','Yemen','France','Algeria','Undefined','Nepal','Lebanon','Bengal','Philippines','Azerbaijan','Libya','Hong Kong','Thailand','Malaysia','Myanmar','Ukraine','Vietnam','Germany','United States','Saudi Arabia','Uzbekistan','Indonesia','Egypt','Russia','Pakistan','Iraq','Turkey'];
+      let seed=12345; function rnd(){ seed=(seed*9301+49297)%233280; return seed/233280; }
+      
+      // 7일 샘플 데이터 생성
+      const allDates = [];
+      const today = new Date();
+      for(let d=6; d>=0; d--){
+        const date = new Date(today);
+        date.setDate(date.getDate() - d);
+        allDates.push(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`);
+      }
+      
+      const trafficByDate = {};
+      allDates.forEach(date => { trafficByDate[date] = []; }); // 모든 날짜 초기화
+      
+      for(let i=0;i<250;i++){
+        const name = i<names.length?names[i]:`Country${i+1}`;
+        countries.push(name);
+        const base=500000*Math.pow(0.92,i);
+        const v=base*0.1*(rnd()-0.5);
+        let prev=Math.max(1000,Math.round(base+v));
+        
+        // 각 날짜별 트래픽 생성
+        allDates.forEach((date, idx) => {
+          if(idx === 0){
+            trafficByDate[date].push(prev);
+          } else {
+            prev = Math.round(prev*(1+(rnd()*0.1-0.05)));
+            trafficByDate[date].push(prev);
+          }
+        });
+      }
+      
+      const lastDate = allDates[allDates.length - 1];
+      return {Country:countries, allDates:allDates, trafficByDate:trafficByDate, lastDate:lastDate};
+    }
+
+    const sampleData = generateSampleData();
+    let currentData = sampleData;
+    let rawCsvRows = null; // 원본 CSV 데이터 저장
+
+    // ---------- CSV load ----------
+    document.getElementById('btnLoad').addEventListener('click', ()=>{
+      const f=document.getElementById('csvFile').files[0];
+      if(!f){ alert('Please select a file.'); return; }
+      Papa.parse(f,{header:true,skipEmptyLines:true,
+        complete:({data})=>{ 
+          rawCsvRows = data; // 원본 데이터 저장
+          const p=processData(data); 
+          if(p){ 
+            currentData=p; 
+            document.getElementById('status').textContent='CSV Loaded'; 
+            createTreemap(currentData);
+            // Update other tabs if they are active
+            if(document.getElementById('tab-risers-fallers').classList.contains('active')){
+              updateRisersFallers(currentData);
+            }
+            if(document.getElementById('tab-country-detail').classList.contains('active')){
+              updateCountrySelect(currentData);
+            }
+            if(document.getElementById('tab-news').classList.contains('active')){
+              loadNewsFromCSV();
+            }
+          } 
+        },
+        error:(e)=> alert('Error reading CSV: '+e)
+      });
+    });
+    
+    // 날짜 범위 필터 적용
+    document.getElementById('btnApplyDateRange').addEventListener('click', ()=>{
+      if(!rawCsvRows || rawCsvRows.length === 0){
+        console.log('No CSV data');
+        return;
+      }
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      
+      if(!startDate || !endDate){
+        console.log('No date range set');
+        return;
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // 종료일 포함
+      
+      if(start > end){
+        console.log('Invalid date range');
+        return;
+      }
+      
+      console.log('Applying date filter:', startDate, '~', endDate);
+      
+      // 날짜 범위 필터링
+      const firstRow = rawCsvRows[0] || {};
+      const allKeys = Object.keys(firstRow);
+      const findColumn = (keys, possibleNames) => {
+        const lowerKeys = keys.map(k => k.toLowerCase());
+        for(const name of possibleNames){
+          const lowerName = name.toLowerCase();
+          const idx = lowerKeys.indexOf(lowerName);
+          if(idx !== -1) return keys[idx];
+        }
+        return null;
+      };
+      
+      const dateCol = findColumn(allKeys, ['Date', 'date', '날짜', 'Date']);
+      
+      if(!dateCol){
+        alert('Date column not found. Date range filter only works with Date,Country,Traffic format.');
+        return;
+      }
+      
+      // 날짜 정규화 함수
+      const normalizeDate = (dateStr) => {
+        let normalized = dateStr.toString().trim();
+        normalized = normalized.replace(/\./g, '-').replace(/\s+/g, '');
+        normalized = normalized.replace(/-+/g, '-');
+        normalized = normalized.replace(/^-+|-+$/g, '');
+        
+        const parts = normalized.split('-');
+        if(parts.length >= 3){
+          const year = parseInt(parts[0]);
+          const month = parseInt(parts[1]);
+          const day = parseInt(parts[2]);
+          if(!isNaN(year) && !isNaN(month) && !isNaN(day)){
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          }
+        }
+        return normalized;
+      };
+      
+      // 날짜 범위 내 데이터만 필터링
+      const filteredRows = rawCsvRows.filter(r => {
+        if(!r[dateCol]) return false;
+        const dateStr = normalizeDate(r[dateCol]);
+        const rowDate = new Date(dateStr);
+        if(isNaN(rowDate)) return false;
+        return rowDate >= start && rowDate <= end;
+      });
+      
+      if(filteredRows.length === 0){
+        alert('No data found in the selected date range.');
+        return;
+      }
+      
+      const p = processData(filteredRows);
+      if(p){
+        currentData = p;
+        document.getElementById('status').textContent = `CSV Loaded (${filteredRows.length} rows, ${startDate} ~ ${endDate})`;
+        
+        // Date Range 표시 업데이트
+        const indicator = document.getElementById('dateRangeIndicator');
+        const rangeText = document.getElementById('dateRangeText');
+        if(indicator && rangeText){
+          const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+          rangeText.textContent = `${startDate} ~ ${endDate} (${daysDiff}일)`;
+          indicator.style.display = 'inline-block';
+        }
+        
+        createTreemap(currentData);
+        // Update other tabs if they are active
+        if(document.getElementById('tab-risers-fallers').classList.contains('active')){
+          updateRisersFallers(currentData);
+        }
+        if(document.getElementById('tab-country-detail').classList.contains('active')){
+          updateCountrySelect(currentData);
+        }
+        if(document.getElementById('tab-news').classList.contains('active')){
+          loadNewsFromCSV();
+        }
+      }
+    });
+    
+    // 날짜 범위 필터 초기화
+    document.getElementById('btnClearDateRange').addEventListener('click', ()=>{
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      
+      // Date Range 표시 숨기기
+      const indicator = document.getElementById('dateRangeIndicator');
+      if(indicator) indicator.style.display = 'none';
+      
+      if(rawCsvRows && rawCsvRows.length > 0){
+        const p = processData(rawCsvRows);
+        if(p){
+          currentData = p;
+          document.getElementById('status').textContent = 'CSV Loaded (All data)';
+          createTreemap(currentData);
+          // Update other tabs if they are active
+          if(document.getElementById('tab-risers-fallers').classList.contains('active')){
+            updateRisersFallers(currentData);
+          }
+          if(document.getElementById('tab-country-detail').classList.contains('active')){
+            updateCountrySelect(currentData);
+          }
+        }
+      }
+    });
+
+    function processData(rows){
+      try{
+        // Date,Country,Traffic (long format) - 대소문자 구분 없이 찾기
+        // 날짜가 중구난방으로 있어도 나라별로 피벗하여 처리
+        const firstRow = rows[0] || {};
+        const allKeys = Object.keys(firstRow);
+        
+        // 컬럼명 찾기 (대소문자 구분 없이)
+        const findColumn = (keys, possibleNames) => {
+          const lowerKeys = keys.map(k => k.toLowerCase());
+          for(const name of possibleNames){
+            const lowerName = name.toLowerCase();
+            const idx = lowerKeys.indexOf(lowerName);
+            if(idx !== -1) return keys[idx];
+          }
+          return null;
+        };
+        
+        const dateCol = findColumn(allKeys, ['Date', 'date', '날짜', 'Date']);
+        const countryCol = findColumn(allKeys, ['Country', 'country', '국가', 'Country']);
+        const trafficCol = findColumn(allKeys, ['Traffic', 'traffic', '트래픽', 'DAU', 'dau', 'Traffic']);
+        
+        if(dateCol && countryCol && trafficCol){
+          
+          // 국가별로 데이터 그룹화
+          const countryDataMap = {};
+          
+          // 날짜 정규화 함수
+          const normalizeDate = (dateStr) => {
+            let normalized = dateStr.toString().trim();
+            normalized = normalized.replace(/\./g, '-').replace(/\s+/g, '');
+            normalized = normalized.replace(/-+/g, '-');
+            normalized = normalized.replace(/^-+|-+$/g, '');
+            
+            const parts = normalized.split('-');
+            if(parts.length >= 3){
+              const year = parseInt(parts[0]);
+              const month = parseInt(parts[1]);
+              const day = parseInt(parts[2]);
+              if(!isNaN(year) && !isNaN(month) && !isNaN(day)){
+                return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              }
+            }
+            return normalized;
+          };
+          
+          rows.forEach(r=>{
+            if(r[dateCol] && r[countryCol] && r[trafficCol]){
+              const dateStr = normalizeDate(r[dateCol]);
+              const country = r[countryCol].toString().trim();
+              const traffic = +r[trafficCol];
+              
+              if(!countryDataMap[country]) countryDataMap[country] = {};
+              countryDataMap[country][dateStr] = traffic;
+            }
+          });
+          
+          // 각 국가별로 날짜 정렬하고 모든 날짜 데이터 사용
+          const countries = Object.keys(countryDataMap);
+          const c = [];
+          const allDates = new Set(); // 모든 날짜 수집
+          
+          countries.forEach(country => {
+            const dates = Object.keys(countryDataMap[country]).sort((a,b)=>{
+              const dateA = new Date(a);
+              const dateB = new Date(b);
+              if(!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
+              return a.localeCompare(b);
+            });
+            
+            dates.forEach(d => allDates.add(d));
+            
+            if(dates.length < 2){
+              // 최소 2일 데이터 필요 (DoD 계산을 위해)
+              return; // 이 국가는 스킵
+            }
+            
+            c.push(country);
+          });
+          
+          // 모든 날짜 정렬
+          const sortedDates = Array.from(allDates).sort((a,b)=>{
+            const dateA = new Date(a);
+            const dateB = new Date(b);
+            if(!isNaN(dateA) && !isNaN(dateB)) return dateA - dateB;
+            return a.localeCompare(b);
+          });
+          
+          // 날짜별 트래픽 데이터 구성: trafficByDate[date][countryIndex] = traffic
+          const trafficByDate = {};
+          sortedDates.forEach(date => {
+            trafficByDate[date] = [];
+            c.forEach(country => {
+              trafficByDate[date].push(countryDataMap[country][date] || 0);
+            });
+          });
+          
+          const lastDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null;
+          
+          if(!c.length){ alert('No valid data found. Need at least 2 days of data for each country.'); return null; }
+          // countryDataMap을 포함시켜 나중에 국가 이름으로 직접 접근 가능하게 함
+          return {Country:c, allDates:sortedDates, trafficByDate:trafficByDate, lastDate:lastDate, countryDataMap:countryDataMap};
+        }
+        
+        alert('Unsupported CSV format. Required: Date,Country,Traffic (or 날짜,국가,트래픽)\n날짜는 중구난방으로 있어도 나라별로 자동 피벗하여 처리됩니다.');
+        return null;
+      }catch(e){ alert('Error processing data: '+e); return null; }
+    }
+
+    // ---------- Stats ----------
+    function calculateStats(data){
+      const total=[], change=[], lastDayTraffic=[];
+      const {Country, allDates, trafficByDate} = data;
+      const comparisonType = document.getElementById('comparisonType').value || 'DoD';
+      
+      // 마지막 날짜 찾기
+      const lastDate = allDates.length > 0 ? new Date(allDates[allDates.length - 1]) : null;
+      
+      for(let i=0;i<Country.length;i++){
+        // 마지막 날 트래픽 (WoW/MoM/QoQ에서 기간 합계로 변경될 수 있음)
+        let lastDayValue = (lastDate && trafficByDate[allDates[allDates.length - 1]] && trafficByDate[allDates[allDates.length - 1]][i]) || 0;
+        lastDayTraffic.push(lastDayValue);
+        
+        // 비교 기준일 찾기
+        let compareDate = null;
+        let compareValue = null;
+        
+        if(lastDate && !isNaN(lastDate)){
+          const compareDateObj = new Date(lastDate);
+          
+          switch(comparisonType){
+            case 'DoD':
+              // Day over Day: 전일 대비 (마지막 날 vs 전날)
+              if(allDates.length > 1){
+                const prevDayDate = allDates[allDates.length - 2]; // 전날
+                if(trafficByDate[prevDayDate] && trafficByDate[prevDayDate][i] !== undefined){
+                  compareValue = trafficByDate[prevDayDate][i];
+                }
+              }
+              break;
+              
+            case 'Period':
+              // Period: 기간 전체 변화 (마지막 날 vs 첫날)
+              if(allDates.length > 0){
+                const firstDate = allDates[0];
+                if(trafficByDate[firstDate] && trafficByDate[firstDate][i] !== undefined){
+                  compareValue = trafficByDate[firstDate][i];
+                }
+              }
+              break;
+              
+            case 'WoW':
+              // Week over Week: 최근 7일 합계 vs 이전 7일 합계
+              {
+                const periodDays = 7;
+                let currentSum = 0, prevSum = 0;
+                const lastIdx = allDates.length - 1;
+                
+                // 최근 7일 합계
+                for(let d = 0; d < periodDays && (lastIdx - d) >= 0; d++){
+                  const dateKey = allDates[lastIdx - d];
+                  if(trafficByDate[dateKey] && trafficByDate[dateKey][i] !== undefined){
+                    currentSum += trafficByDate[dateKey][i];
+                  }
+                }
+                
+                // 이전 7일 합계
+                for(let d = periodDays; d < periodDays * 2 && (lastIdx - d) >= 0; d++){
+                  const dateKey = allDates[lastIdx - d];
+                  if(trafficByDate[dateKey] && trafficByDate[dateKey][i] !== undefined){
+                    prevSum += trafficByDate[dateKey][i];
+                  }
+                }
+                
+                if(prevSum > 0) compareValue = prevSum;
+                lastDayValue = currentSum > 0 ? currentSum : lastDayValue;
+              }
+              break;
+              
+            case 'MoM':
+              // Month over Month: 최근 30일 합계 vs 이전 30일 합계
+              {
+                const periodDays = 30;
+                let currentSum = 0, prevSum = 0;
+                const lastIdx = allDates.length - 1;
+                
+                // 최근 30일 합계
+                for(let d = 0; d < periodDays && (lastIdx - d) >= 0; d++){
+                  const dateKey = allDates[lastIdx - d];
+                  if(trafficByDate[dateKey] && trafficByDate[dateKey][i] !== undefined){
+                    currentSum += trafficByDate[dateKey][i];
+                  }
+                }
+                
+                // 이전 30일 합계
+                for(let d = periodDays; d < periodDays * 2 && (lastIdx - d) >= 0; d++){
+                  const dateKey = allDates[lastIdx - d];
+                  if(trafficByDate[dateKey] && trafficByDate[dateKey][i] !== undefined){
+                    prevSum += trafficByDate[dateKey][i];
+                  }
+                }
+                
+                if(prevSum > 0) compareValue = prevSum;
+                lastDayValue = currentSum > 0 ? currentSum : lastDayValue;
+              }
+              break;
+              
+            case 'QoQ':
+              // Quarter over Quarter: 최근 90일 합계 vs 이전 90일 합계
+              {
+                const periodDays = 90;
+                let currentSum = 0, prevSum = 0;
+                const lastIdx = allDates.length - 1;
+                
+                // 최근 90일 합계
+                for(let d = 0; d < periodDays && (lastIdx - d) >= 0; d++){
+                  const dateKey = allDates[lastIdx - d];
+                  if(trafficByDate[dateKey] && trafficByDate[dateKey][i] !== undefined){
+                    currentSum += trafficByDate[dateKey][i];
+                  }
+                }
+                
+                // 이전 90일 합계
+                for(let d = periodDays; d < periodDays * 2 && (lastIdx - d) >= 0; d++){
+                  const dateKey = allDates[lastIdx - d];
+                  if(trafficByDate[dateKey] && trafficByDate[dateKey][i] !== undefined){
+                    prevSum += trafficByDate[dateKey][i];
+                  }
+                }
+                
+                if(prevSum > 0) compareValue = prevSum;
+                lastDayValue = currentSum > 0 ? currentSum : lastDayValue;
+              }
+              break;
+              
+            case 'YoY':
+              // Year over Year: 1년 전
+              compareDateObj.setFullYear(compareDateObj.getFullYear() - 1);
+              compareDate = `${compareDateObj.getFullYear()}-${String(compareDateObj.getMonth()+1).padStart(2,'0')}-${String(compareDateObj.getDate()).padStart(2,'0')}`;
+              // 가장 가까운 날짜 찾기
+              const yoyDates = allDates.filter(d => {
+                const dObj = new Date(d);
+                const diff = Math.abs((dObj - compareDateObj) / (1000 * 60 * 60 * 24));
+                return diff <= 7; // 7일 이내 차이
+              });
+              if(yoyDates.length > 0){
+                const closestDate = yoyDates.sort((a,b) => {
+                  const aDiff = Math.abs((new Date(a) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  const bDiff = Math.abs((new Date(b) - compareDateObj) / (1000 * 60 * 60 * 24));
+                  return aDiff - bDiff;
+                })[0];
+                if(trafficByDate[closestDate] && trafficByDate[closestDate][i] !== undefined){
+                  compareValue = trafficByDate[closestDate][i];
+                }
+              }
+              break;
+          }
+        }
+        
+        // 변화율 계산
+        if(compareValue !== null && compareValue > 0 && lastDayValue > 0){
+          change.push(((lastDayValue - compareValue) / compareValue) * 100);
+        } else {
+          change.push(0);
+        }
+        
+        // total은 마지막 날 트래픽으로 설정
+        total.push(lastDayValue);
+      }
+      const topN = +document.getElementById('topCount').value || 180;
+      const sortBy = document.getElementById('sortBy').value || 'revenue';
+      let idx;
+      if(sortBy==='revenue'){
+        idx=Array.from({length:data.Country.length},(_,i)=>i).sort((a,b)=> total[b]-total[a]).slice(0,topN);
+      } else if(sortBy==='change_desc'){
+        // + 변화량 큰 순 (변화량 절대값이 큰 순서대로)
+        idx=Array.from({length:data.Country.length},(_,i)=>i)
+          .sort((a,b)=> Math.abs(change[b])-Math.abs(change[a])) // 절대값 기준 큰 순서
+          .slice(0,topN);
+      } else if(sortBy==='change_asc'){
+        // - 변화량 큰 순 (하락폭이 큰 순서대로, 음수 중 절대값 큰 순)
+        idx=Array.from({length:data.Country.length},(_,i)=>i)
+          .filter(i=> change[i] < 0) // 음수만 필터링
+          .sort((a,b)=> Math.abs(change[a])-Math.abs(change[b])) // 절대값 기준 큰 순서 (하락폭 큰 순)
+          .slice(0,topN);
+      }
+
+      const topCountries=idx.map(i=>data.Country[i]);
+      const topRevenue=idx.map(i=>total[i]);
+      const topChange=idx.map(i=>change[i]);
+      const totalSum=topRevenue.reduce((a,b)=>a+b,0);
+      const avgChange=topChange.reduce((a,b)=>a+b,0)/topChange.length;
+      
+      // Max Increase/Decrease 국가 찾기
+      const maxChangeIdx = topChange.indexOf(Math.max(...topChange));
+      const minChangeIdx = topChange.indexOf(Math.min(...topChange));
+      const maxChangeCountry = topCountries[maxChangeIdx] || '';
+      const minChangeCountry = topCountries[minChangeIdx] || '';
+      
+      // Traffic Top 10 (마지막 날 트래픽 기준) - countryDataMap에서 직접 가져옴
+      const allCountries = data.Country;
+      const lastDateKey = data.allDates[data.allDates.length - 1];
+      
+      // countryDataMap에서 직접 마지막 날 트래픽 가져오기
+      // 중요: 마지막 날짜에 데이터가 있는 국가만 포함!
+      const countryTrafficMap = {};
+      allCountries.forEach((country, idx) => {
+        if(data.countryDataMap && data.countryDataMap[country] && data.countryDataMap[country][lastDateKey] !== undefined) {
+          // 마지막 날짜에 실제 데이터가 있는 경우만 포함
+          const trafficValue = Number(data.countryDataMap[country][lastDateKey]) || 0;
+          if(trafficValue > 0) { // 0보다 큰 경우만
+            countryTrafficMap[country] = {
+              traffic: trafficValue,
+              change: change[idx],
+              index: idx
+            };
+          }
+        }
+      });
+      
+      // 트래픽 기준 Top 10 (마지막 날짜에 데이터가 있는 국가만!)
+      const trafficTop10 = Object.entries(countryTrafficMap)
+        .sort((a, b) => b[1].traffic - a[1].traffic)
+        .slice(0, 10)
+        .map(([country, data]) => ({
+          country: country,
+          traffic: data.traffic,
+          change: data.change
+        }));
+      
+      // 디버깅 로그
+      console.log('=== Traffic Top 10 (Fixed v2) ===');
+      console.log('Last date:', lastDateKey);
+      console.log('Countries with data on last date:', Object.keys(countryTrafficMap).length);
+      console.log('Top 10:', trafficTop10.map(t => `${t.country}: ${t.traffic.toLocaleString()}`));
+      
+      return {topCountries, topRevenue, topChange, totalSum, avgChange,
+              maxChange:Math.max(...topChange), minChange:Math.min(...topChange),
+              maxChangeCountry, minChangeCountry, trafficTop10};
+    }
+
+    // ---------- Render ----------
+    const overlay=document.getElementById('loadingOverlay');
+    ['topCount','sortBy','groupByContinent','comparisonType'].forEach(id=>{
+      document.getElementById(id).addEventListener('change', ()=> createTreemap(currentData));
+    });
+
+    function createTreemap(data){
+      const overlay = document.getElementById('loadingOverlay');
+      if(overlay) overlay.style.display='flex';
+      setTimeout(()=>{
+        const stats=calculateStats(data);
+        const topN=+document.getElementById('topCount').value || 180;
+        const groupBy=document.getElementById('groupByContinent').checked;
+        const comparisonType = document.getElementById('comparisonType').value || 'DoD';
+        
+        // 비교 기준 정보 업데이트
+        const comparisonInfo = document.getElementById('comparisonInfo');
+        const dataContextInfo = document.getElementById('dataContextInfo');
+        const dataContextPeriod = document.getElementById('dataContextPeriod');
+        const dataContextComparison = document.getElementById('dataContextComparison');
+        const dataContextRows = document.getElementById('dataContextRows');
+        
+        if(data.allDates && data.allDates.length > 0){
+          const lastDate = data.allDates[data.allDates.length - 1];
+          const firstDate = data.allDates[0];
+          const prevDate = data.allDates.length > 1 ? data.allDates[data.allDates.length - 2] : firstDate;
+          
+          const formatDate = (d) => {
+            const date = new Date(d);
+            return `${date.getMonth()+1}/${date.getDate()}`;
+          };
+          
+          const formatDateFull = (d) => {
+            const date = new Date(d);
+            return `${date.getFullYear()}.${String(date.getMonth()+1).padStart(2,'0')}.${String(date.getDate()).padStart(2,'0')}`;
+          };
+          
+          let comparisonLabel = '';
+          let compareFromDate = '';
+          let compareToDate = formatDate(lastDate);
+          
+          switch(comparisonType){
+            case 'DoD':
+              comparisonLabel = '전일 대비';
+              compareFromDate = formatDate(prevDate);
+              break;
+            case 'WoW':
+              comparisonLabel = '주간 합계 (7일)';
+              const weekAgo = new Date(lastDate);
+              weekAgo.setDate(weekAgo.getDate() - 7);
+              compareFromDate = `최근7일 vs 이전7일`;
+              break;
+            case 'MoM':
+              comparisonLabel = '월간 합계 (30일)';
+              const monthAgo = new Date(lastDate);
+              monthAgo.setMonth(monthAgo.getMonth() - 1);
+              compareFromDate = `최근30일 vs 이전30일`;
+              break;
+            case 'QoQ':
+              comparisonLabel = '분기 합계 (90일)';
+              compareFromDate = `최근90일 vs 이전90일`;
+              break;
+            case 'YoY':
+              comparisonLabel = '전년 대비';
+              const yearAgo = new Date(lastDate);
+              yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+              compareFromDate = formatDate(yearAgo);
+              break;
+            case 'Period':
+              comparisonLabel = '기간 전체';
+              compareFromDate = formatDate(firstDate);
+              break;
+          }
+          
+          // 작은 info 텍스트 (드롭다운 옆)
+          if(comparisonInfo){
+            comparisonInfo.textContent = `${compareFromDate} → ${compareToDate}`;
+          }
+          
+          // 큰 데이터 기준 박스
+          if(dataContextInfo){
+            dataContextInfo.style.display = 'block';
+            
+            // 데이터 기간
+            const daysDiff = data.allDates.length;
+            dataContextPeriod.textContent = `${formatDateFull(firstDate)} ~ ${formatDateFull(lastDate)} (${daysDiff}일)`;
+            
+            // 변화율 기준
+            dataContextComparison.innerHTML = `<span style="color:#2ed573">${comparisonLabel}</span> <span style="color:var(--muted);font-weight:400">(${compareFromDate} → ${compareToDate})</span>`;
+            
+            // 데이터 수
+            const totalCountries = data.Country ? data.Country.length : 0;
+            dataContextRows.textContent = `${totalCountries}개 국가`;
+          }
+        }
+
+        // KPIs
+        document.getElementById('stats').innerHTML = `
+          <div class="stat-item"><div class="stat-label">Total Traffic</div><div class="stat-value">${(stats.totalSum/1e6).toFixed(2)}M</div></div>
+          <div class="stat-item"><div class="stat-label">Avg Change</div><div class="stat-value ${stats.avgChange>=0?'positive':'negative'}">${stats.avgChange>=0?'+':''}${stats.avgChange.toFixed(2)}%</div></div>
+          <div class="stat-item"><div class="stat-label">Max Increase</div><div class="stat-value positive">+${stats.maxChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.maxChangeCountry})</span></div></div>
+          <div class="stat-item"><div class="stat-label">Max Decrease</div><div class="stat-value negative">${stats.minChange.toFixed(2)}% <span style="font-size:14px;opacity:0.8">(${stats.minChangeCountry})</span></div></div>`;
+        
+        // Traffic Top 10 표 제목 업데이트 (마지막 날짜 표시: 연도.월.일 형식)
+        const top10Title = document.getElementById('trafficTop10Title');
+        if(top10Title && data.lastDate){
+          const lastDateObj = new Date(data.lastDate);
+          if(!isNaN(lastDateObj)){
+            const year = lastDateObj.getFullYear().toString().slice(-2); // 마지막 2자리
+            const month = String(lastDateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(lastDateObj.getDate()).padStart(2, '0');
+            top10Title.textContent = `Traffic Top 10 (${year}.${month}.${day} 기준)`;
+          } else {
+            // 날짜 파싱 실패 시 원본 날짜 문자열에서 추출 시도
+            const dateMatch = data.lastDate.match(/(\d{1,2})/);
+            if(dateMatch){
+              top10Title.textContent = `Traffic Top 10 (${dateMatch[1]}일 기준)`;
+            } else {
+              top10Title.textContent = 'Traffic Top 10 (DoD 기준)';
+            }
+          }
+        } else if(top10Title){
+          top10Title.textContent = 'Traffic Top 10 (DoD 기준)';
+        }
+        
+        // Traffic Top 10 표 업데이트
+        const top10Body = document.getElementById('trafficTop10Body');
+        if(top10Body && stats.trafficTop10){
+          top10Body.innerHTML = stats.trafficTop10.map((item, idx) => {
+            const changeColor = item.change >= 0 ? '#00ff00' : '#ff4d4d';
+            const changeSign = item.change >= 0 ? '+' : '';
+            return `
+              <tr style="border-bottom:1px solid var(--border);${idx % 2 === 0 ? 'background:rgba(255,255,255,0.02)' : ''}">
+                <td style="padding:14px;font-size:16px;color:#fff;font-weight:600">${idx + 1}</td>
+                <td style="padding:14px;font-size:16px;color:#fff;font-weight:600">${item.country}</td>
+                <td style="padding:14px;text-align:right;font-size:16px;color:#fff">${(item.traffic/1e6).toFixed(2)}M</td>
+                <td style="padding:14px;text-align:right;font-size:16px;color:${changeColor};font-weight:600">${changeSign}${item.change.toFixed(2)}%</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        // Build treemap arrays
+        let ids=[], labels=[], parents=[], values=[], colors=[], text=[], custom=[];
+
+        if(groupBy){
+          const groups={};
+          stats.topCountries.forEach((c,i)=>{ const G=getContinent(c); (groups[G]||(groups[G]={c:[],v:[],chg:[]})).c.push(c); groups[G].v.push(stats.topRevenue[i]); groups[G].chg.push(stats.topChange[i]); });
+          const continents=Object.keys(groups).sort((a,b)=> groups[b].v.reduce((x,y)=>x+y,0)-groups[a].v.reduce((x,y)=>x+y,0));
+
+          continents.forEach(cont=>{
+            const g=groups[cont];
+            const total=g.v.reduce((a,b)=>a+b,0);
+            const contId=`continent:${cont}`;
+            // 대륙 텍스트 크게 (볼드체) - Finviz 스타일
+            const continentTextShadow = 'text-shadow: 2px 2px 4px rgba(0,0,0,0.7), 0 0 6px rgba(0,0,0,0.6);';
+            ids.push(contId); labels.push(cont); parents.push(''); values.push(total); colors.push('#262931'); text.push(`<b style="font-size:86.4px;font-weight:900;letter-spacing:2px;color:#FFFFFF;${continentTextShadow}">${cont}</b>`); custom.push([null,null,cont]);
+
+            // thresholds for label density by share
+            const small=0.010, medium=0.025;
+            const maxAbsChange = g.chg.length > 0 ? Math.max(...g.chg.map(c => Math.abs(c))) : 1;
+            // 국가별 글씨 크기 고정 (모든 국가 동일)
+            const countryFontSize = 20; // India 크기로 고정
+            g.c.forEach((country,i)=>{
+              const revenue=g.v[i];
+              const change=g.chg[i];
+              const share=revenue/total; // area fraction approx
+              // 변화량에 따른 강도 계산
+              const changeIntensity = maxAbsChange > 0 ? Math.abs(change) / maxAbsChange : 0;
+              // 변화가 클수록 더 진한 색상
+              const col=colorFromChange(change, changeIntensity);
+              ids.push(`country:${cont}:${country}`);
+              labels.push(country);
+              parents.push(contId);
+              values.push(revenue);
+              colors.push(col);
+              let t='';
+              // 변화량만 표시, 볼드체, 명암 추가
+              const textShadow = 'text-shadow: 1px 1px 3px rgba(0,0,0,0.7), 0 0 4px rgba(0,0,0,0.5);';
+              if(share>=small){
+                t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b><br><b style="font-size:${Math.max(12,countryFontSize*0.75)}px;font-weight:bold;color:#FFFFFF;${textShadow}">${change>=0?'+':''}${change.toFixed(1)}%</b>`;
+              }else{
+                t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b>`;
+              }
+              text.push(t);
+              custom.push([change, revenue, cont]);
+            });
+          });
+                } else {
+          const total = stats.topRevenue.reduce((a,b)=>a+b,0);
+          const small=0.006;
+          const maxAbsChange = stats.topChange.length > 0 ? Math.max(...stats.topChange.map(c => Math.abs(c))) : 1;
+          // 국가별 글씨 크기 고정 (모든 국가 동일)
+          const countryFontSize = 20; // India 크기로 고정
+          stats.topCountries.forEach((country,i)=>{
+            const rev=stats.topRevenue[i]; const ch=stats.topChange[i]; const share=rev/total; const cont=getContinent(country);
+            // 변화량에 따른 강도 계산
+            const changeIntensity = maxAbsChange > 0 ? Math.abs(ch) / maxAbsChange : 0;
+            // 변화가 클수록 더 진한 색상
+            const col = colorFromChange(ch, changeIntensity);
+            ids.push(`country::${country}`); labels.push(country); parents.push(''); values.push(rev); colors.push(col);
+            let t='';
+            // 변화량만 표시, 볼드체, 명암 추가
+            const textShadow = 'text-shadow: 1px 1px 3px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.7);';
+            if(share>=small) t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b><br><b style="font-size:${Math.max(12,countryFontSize*0.75)}px;font-weight:bold;color:#FFFFFF;${textShadow}">${ch>=0?'+':''}${ch.toFixed(1)}%</b>`;
+            else t = `<b style="font-size:${countryFontSize}px;font-weight:bold;color:#FFFFFF;${textShadow}">${country}</b>`;
+            text.push(t);
+            custom.push([ch, rev, cont]);
+          });
+        }
+
+        const height = 900; // fixed height for visual stability
+
+        const trace={
+          type:'treemap',
+          ids, labels, parents, values,
+          text, textinfo:'text', textposition:'middle center',
+          marker:{ colors, line:{width:1, color:'#000000'}, depthfade:false },
+          tiling:{ pad: 1 },
+          branchvalues:'total', maxdepth: groupBy ? 2 : 1,
+          hovertemplate:'<b>%{label}</b><br>Traffic: %{value:,.0f}<br>'+
+                        'Change: %{customdata[0]:.2f}%<br>Sector: %{customdata[2]}<extra></extra>',
+          customdata: custom,
+          pathbar:{visible:false}
+        };
+
+        const layout={
+          paper_bgcolor: '#262931',
+          plot_bgcolor: '#262931',
+          margin:{l:0,r:0,t:0,b:0}, height,
+          font:{family:'Arial, Helvetica, sans-serif',size:11,color:'#FFFFFF'},
+          hoverlabel:{bgcolor:'#161b22',bordercolor:'#30363d',font:{color:'#fff'}}
+        };
+
+        Plotly.newPlot('treemap',[trace],layout,{responsive:true}).then(()=>{ 
+          if(overlay) overlay.style.display='none';
+          
+          // Treemap 클릭 이벤트: 국가 클릭 시 Country Detail로 이동
+          const treemapDiv = document.getElementById('treemap');
+          treemapDiv.on('plotly_click', (data) => {
+            if(data.points && data.points.length > 0){
+              const point = data.points[0];
+              const label = point.label;
+              
+              // 국가명 추출 (대륙이 아닌 경우만)
+              if(label && currentData && currentData.Country && currentData.Country.includes(label)){
+                selectCountryFromExternal(label);
+              }
+            }
+          });
+        });
+      }, 40);
+    }
+
+    // ---------- Tab Management ----------
+    document.querySelectorAll('.tab-button').forEach(button => {
+      button.addEventListener('click', () => {
+        const tabName = button.getAttribute('data-tab');
+        
+        // Remove active class from all buttons and contents
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        // Add active class to clicked button and corresponding content
+        button.classList.add('active');
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        
+        // News 탭에서는 Treemap 필터 숨기기
+        const treemapFilters = document.getElementById('treemapFilters');
+        if(treemapFilters){
+          treemapFilters.style.display = (tabName === 'news') ? 'none' : 'flex';
+        }
+        
+        // Update content based on tab
+        if(tabName === 'risers-fallers'){
+          updateRisersFallers(currentData);
+        } else if(tabName === 'country-detail'){
+          updateCountrySelect(currentData);
+        } else if(tabName === 'news'){
+          loadNewsFromCSV();
+        }
+      });
+    });
+
+    // ---------- Risers/Fallers Tab ----------
+    function updateRisersFallers(data){
+      if(!data || !data.Country) return;
+      
+      const stats = calculateStats(data);
+      const threshold = 5; // 5% 이상
+      
+      // 트래픽 필터 값 가져오기 (기본값: 50000)
+      const trafficFilter = parseFloat(document.getElementById('risersFallersTrafficFilter')?.value || '50000');
+      
+      // 비교 기준 라벨 업데이트
+      const comparisonType = document.getElementById('comparisonType')?.value || 'DoD';
+      const comparisonLabels = {
+        'DoD': 'DoD (전일 대비)',
+        'WoW': 'WoW (7일 합계)',
+        'MoM': 'MoM (30일 합계)',
+        'QoQ': 'QoQ (90일 합계)',
+        'YoY': 'YoY (전년 대비)',
+        'Period': 'Period (기간 전체)'
+      };
+      const compLabel = comparisonLabels[comparisonType] || comparisonType;
+      
+      document.getElementById('risersTitle').innerHTML = `📈 Risers <span style="font-size:12px;font-weight:normal">(${compLabel} 5%↑)</span>`;
+      document.getElementById('fallersTitle').innerHTML = `📉 Fallers <span style="font-size:12px;font-weight:normal">(${compLabel} 5%↓)</span>`;
+      
+      const risers = [];
+      const fallers = [];
+      
+      for(let i = 0; i < stats.topCountries.length; i++){
+        const change = stats.topChange[i];
+        const country = stats.topCountries[i];
+        const traffic = stats.topRevenue[i];
+        
+        // 5% 이상 변화 + 트래픽 필터 조건 만족
+        if(change >= threshold && traffic >= trafficFilter){
+          risers.push({country, change, traffic});
+        } else if(change <= -threshold && traffic >= trafficFilter){
+          fallers.push({country, change, traffic});
+        }
+      }
+      
+      // Sort by absolute change
+      risers.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+      fallers.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+      
+      // Render Risers
+      const risersList = document.getElementById('risersList');
+      if(risers.length > 0){
+        risersList.innerHTML = risers.map(item => `
+          <div class="country-item" style="cursor:pointer" onclick="selectCountryFromExternal('${item.country}')" title="클릭하여 상세 정보 보기">
+            <div>
+              <div class="country-name">${item.country}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">${(item.traffic/1e6).toFixed(2)}M</div>
+            </div>
+            <div class="country-change positive">+${item.change.toFixed(2)}%</div>
+          </div>
+        `).join('');
+      } else {
+        risersList.innerHTML = `
+          <div class="empty-state" style="padding:40px 20px">
+            <div class="empty-state-icon">📈</div>
+            <div>5% 이상 상승한 국가가 없습니다.</div>
+            <div style="margin-top:8px;font-size:12px;color:var(--muted)">(트래픽 ${(trafficFilter/1000).toFixed(0)}K 이상 조건 포함)</div>
+          </div>
+        `;
+      }
+      
+      // Render Fallers
+      const fallersList = document.getElementById('fallersList');
+      if(fallers.length > 0){
+        fallersList.innerHTML = fallers.map(item => `
+          <div class="country-item" style="cursor:pointer" onclick="selectCountryFromExternal('${item.country}')" title="클릭하여 상세 정보 보기">
+            <div>
+              <div class="country-name">${item.country}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px">${(item.traffic/1e6).toFixed(2)}M</div>
+            </div>
+            <div class="country-change negative">${item.change.toFixed(2)}%</div>
+          </div>
+        `).join('');
+      } else {
+        fallersList.innerHTML = `
+          <div class="empty-state" style="padding:40px 20px">
+            <div class="empty-state-icon">📉</div>
+            <div>5% 이상 하락한 국가가 없습니다.</div>
+            <div style="margin-top:8px;font-size:12px;color:var(--muted)">(트래픽 ${(trafficFilter/1000).toFixed(0)}K 이상 조건 포함)</div>
+          </div>
+        `;
+      }
+    }
+
+    // 트래픽 필터 변경 시 자동 업데이트
+    document.getElementById('risersFallersTrafficFilter')?.addEventListener('input', () => {
+      if(document.getElementById('tab-risers-fallers').classList.contains('active')){
+        updateRisersFallers(currentData);
+      }
+    });
+
+    // ---------- Country Detail Tab ----------
+    let allCountriesList = []; // 검색용 국가 목록
+    let countryTrafficMap = {}; // 국가별 트래픽 맵 (빠른 선택용)
+    let top10Mode = 'lastDay'; // 'lastDay' or 'cumulative'
+    
+    // Top 10 모드 전환
+    function setTop10Mode(mode) {
+      top10Mode = mode;
+      
+      // 버튼 스타일 업데이트
+      document.getElementById('top10LastDay').style.background = mode === 'lastDay' ? 'var(--accent)' : 'transparent';
+      document.getElementById('top10LastDay').style.color = mode === 'lastDay' ? 'white' : 'var(--text)';
+      document.getElementById('top10Cumulative').style.background = mode === 'cumulative' ? 'var(--accent)' : 'transparent';
+      document.getElementById('top10Cumulative').style.color = mode === 'cumulative' ? 'white' : 'var(--text)';
+      
+      // Top 10 다시 계산
+      if(currentData) {
+        updateQuickSelectTop10(currentData);
+      }
+    }
+    
+    function updateCountrySelect(data){
+      if(!data || !data.Country) return;
+      
+      allCountriesList = data.Country.sort();
+      
+      // 드롭다운 업데이트 (숨김 처리되어 있지만 호환성 유지)
+      const select = document.getElementById('countrySelect');
+      select.innerHTML = '<option value="">국가를 선택하세요...</option>';
+      allCountriesList.forEach(country => {
+        const option = document.createElement('option');
+        option.value = country;
+        option.textContent = country;
+        select.appendChild(option);
+      });
+      
+      // 트래픽 순위 계산 (빠른 선택용)
+      const stats = calculateStats(data);
+      countryTrafficMap = {};
+      for(let i = 0; i < stats.topCountries.length; i++){
+        countryTrafficMap[stats.topCountries[i]] = {
+          traffic: stats.topRevenue[i],
+          change: stats.topChange[i],
+          rank: i + 1
+        };
+      }
+      
+      // 빠른 선택 Top 10 업데이트
+      updateQuickSelectTop10(data);
+      
+      // 검색 기능 초기화
+      initCountrySearch(data);
+    }
+    
+    // 빠른 선택 Top 10 업데이트
+    function updateQuickSelectTop10(data){
+      const quickSelect = document.getElementById('quickSelectTop10');
+      const dateInfo = document.getElementById('top10DateInfo');
+      if(!quickSelect) return;
+      
+      const stats = calculateStats(data);
+      let trafficTop10 = [];
+      let dateInfoText = '';
+      
+      if(top10Mode === 'lastDay') {
+        // 마지막 일 기준 (기존 로직)
+        trafficTop10 = stats.trafficTop10 || [];
+        const lastDate = data.allDates[data.allDates.length - 1];
+        if(lastDate) {
+          const d = new Date(lastDate);
+          if(!isNaN(d)) {
+            dateInfoText = `📅 ${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} 기준`;
+          }
+        }
+      } else {
+        // 기간 누적 기준 - 전체 기간 트래픽 합계
+        const countryTotals = {};
+        const allCountries = data.Country;
+        
+        // 각 국가별 전체 기간 트래픽 합계 계산
+        if(data.countryDataMap) {
+          allCountries.forEach((country, idx) => {
+            if(data.countryDataMap[country]) {
+              let total = 0;
+              Object.values(data.countryDataMap[country]).forEach(val => {
+                total += Number(val) || 0;
+              });
+              if(total > 0) {
+                countryTotals[country] = {
+                  traffic: total,
+                  change: stats.topChange[idx] || 0
+                };
+              }
+            }
+          });
+        }
+        
+        // 합계 기준 Top 10
+        trafficTop10 = Object.entries(countryTotals)
+          .sort((a, b) => b[1].traffic - a[1].traffic)
+          .slice(0, 10)
+          .map(([country, d]) => ({
+            country: country,
+            traffic: d.traffic,
+            change: d.change
+          }));
+        
+        // 날짜 범위 표시
+        const firstDate = data.allDates[0];
+        const lastDate = data.allDates[data.allDates.length - 1];
+        if(firstDate && lastDate) {
+          const d1 = new Date(firstDate);
+          const d2 = new Date(lastDate);
+          if(!isNaN(d1) && !isNaN(d2)) {
+            dateInfoText = `📅 ${d1.getFullYear()}.${String(d1.getMonth()+1).padStart(2,'0')}.${String(d1.getDate()).padStart(2,'0')} ~ ${d2.getFullYear()}.${String(d2.getMonth()+1).padStart(2,'0')}.${String(d2.getDate()).padStart(2,'0')} 누적`;
+          }
+        }
+      }
+      
+      // 날짜 정보 업데이트
+      if(dateInfo) {
+        dateInfo.textContent = dateInfoText;
+      }
+      
+      quickSelect.innerHTML = trafficTop10.map((item, idx) => {
+        const country = item.country;
+        const traffic = item.traffic;
+        const change = item.change;
+        const changeColor = change >= 0 ? '#00ff00' : '#ff4d4d';
+        const changeSign = change >= 0 ? '+' : '';
+        
+        // 트래픽 포맷팅 (마지막 일 vs 누적에 따라 다르게)
+        const trafficText = top10Mode === 'lastDay' 
+          ? `${(traffic/1e6).toFixed(2)}M`
+          : `${(traffic/1e9).toFixed(2)}B`;
+        
+        return `
+          <button class="quick-select-btn" data-country="${country}" title="${country}: ${trafficText} (${changeSign}${change.toFixed(2)}%)">
+            <div style="font-weight:600;margin-bottom:4px">${country}</div>
+            <div style="font-size:11px;color:var(--muted)">#${idx + 1}</div>
+            <div style="font-size:11px;color:${changeColor};margin-top:2px">${changeSign}${change.toFixed(1)}%</div>
+          </button>
+        `;
+      }).join('');
+      
+      // 클릭 이벤트 추가
+      quickSelect.querySelectorAll('.quick-select-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const country = btn.getAttribute('data-country');
+          // Country Detail 탭으로 이동
+          document.querySelector('[data-tab="country-detail"]').click();
+          setTimeout(() => {
+            showCountryDetail(data, country);
+            // 검색 입력창에도 표시
+            document.getElementById('countrySearch').value = country;
+          }, 100);
+        });
+      });
+    }
+    
+    // 검색 기능 초기화
+    function initCountrySearch(data){
+      const searchInput = document.getElementById('countrySearch');
+      const autocomplete = document.getElementById('countryAutocomplete');
+      
+      if(!searchInput || !autocomplete) return;
+      
+      let searchTimeout = null;
+      
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim().toLowerCase();
+        
+        clearTimeout(searchTimeout);
+        
+        if(query.length === 0){
+          autocomplete.style.display = 'none';
+          return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+          // 국가 검색
+          const matches = allCountriesList.filter(country => 
+            country.toLowerCase().includes(query)
+          ).slice(0, 10); // 최대 10개
+          
+          if(matches.length > 0){
+            autocomplete.innerHTML = matches.map(country => {
+              const highlight = country.replace(
+                new RegExp(`(${query})`, 'gi'),
+                '<strong style="color:#238636">$1</strong>'
+              );
+              return `
+                <div class="country-autocomplete-item" data-country="${country}">
+                  ${highlight}
+                </div>
+              `;
+            }).join('');
+            
+            autocomplete.style.display = 'block';
+            
+            // 클릭 이벤트
+            autocomplete.querySelectorAll('.country-autocomplete-item').forEach(item => {
+              item.addEventListener('click', () => {
+                const country = item.getAttribute('data-country');
+                searchInput.value = country;
+                autocomplete.style.display = 'none';
+                showCountryDetail(data, country);
+              });
+              
+              item.addEventListener('mouseenter', () => {
+                autocomplete.querySelectorAll('.country-autocomplete-item').forEach(i => i.classList.remove('highlight'));
+                item.classList.add('highlight');
+              });
+            });
+          } else {
+            autocomplete.innerHTML = '<div style="padding:12px;color:var(--muted);text-align:center">검색 결과가 없습니다</div>';
+            autocomplete.style.display = 'block';
+          }
+        }, 200);
+      });
+      
+      // Enter 키로 첫 번째 결과 선택
+      searchInput.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter'){
+          const firstItem = autocomplete.querySelector('.country-autocomplete-item');
+          if(firstItem){
+            firstItem.click();
+          }
+        } else if(e.key === 'Escape'){
+          autocomplete.style.display = 'none';
+        }
+      });
+      
+      // 외부 클릭 시 자동완성 닫기
+      document.addEventListener('click', (e) => {
+        if(!searchInput.contains(e.target) && !autocomplete.contains(e.target)){
+          autocomplete.style.display = 'none';
+        }
+      });
+    }
+    
+    // 외부에서 국가 선택 함수 (Treemap, Risers/Fallers에서 호출)
+    function selectCountryFromExternal(country){
+      if(!country || !currentData) return;
+      
+      // Country Detail 탭으로 이동
+      const tabButton = document.querySelector('[data-tab="country-detail"]');
+      if(tabButton){
+        tabButton.click();
+        setTimeout(() => {
+          showCountryDetail(currentData, country);
+          document.getElementById('countrySearch').value = country;
+        }, 100);
+      }
+    }
+
+    function showCountryDetail(data, country){
+      // countryDataMap 사용 (인덱스 불일치 방지)
+      const countryData = data.countryDataMap ? data.countryDataMap[country] : null;
+      
+      if(!countryData) return;
+      
+      const comparisonType = document.getElementById('comparisonType').value || 'DoD';
+      const lastDateIndex = data.allDates.length - 1;
+      const lastDateKey = data.allDates[lastDateIndex];
+      const lastTraffic = countryData[lastDateKey] || 0;
+      let lastTrafficForCalc = lastTraffic; // WoW/MoM/QoQ에서 기간 합계로 변경됨
+      
+      // Calculate change
+      let compareValue = null;
+      const lastDateObj = new Date(lastDateKey);
+      
+      if(!isNaN(lastDateObj)){
+        const compareDateObj = new Date(lastDateObj);
+        
+        switch(comparisonType){
+          case 'DoD':
+            // 전일 대비 (마지막 날 vs 전날)
+            if(data.allDates.length > 1){
+              const prevDayDate = data.allDates[data.allDates.length - 2];
+              if(countryData[prevDayDate] !== undefined){
+                compareValue = countryData[prevDayDate];
+              }
+            }
+            break;
+          case 'Period':
+            // 기간 전체 (마지막 날 vs 첫날)
+            if(data.allDates.length > 0 && countryData[data.allDates[0]] !== undefined){
+              compareValue = countryData[data.allDates[0]];
+            }
+            break;
+          case 'WoW':
+            // Week over Week: 최근 7일 합계 vs 이전 7일 합계
+            {
+              const periodDays = 7;
+              let currentSum = 0, prevSum = 0;
+              const lastIdx = data.allDates.length - 1;
+              
+              for(let d = 0; d < periodDays && (lastIdx - d) >= 0; d++){
+                const dateKey = data.allDates[lastIdx - d];
+                if(countryData[dateKey] !== undefined){
+                  currentSum += countryData[dateKey];
+                }
+              }
+              for(let d = periodDays; d < periodDays * 2 && (lastIdx - d) >= 0; d++){
+                const dateKey = data.allDates[lastIdx - d];
+                if(countryData[dateKey] !== undefined){
+                  prevSum += countryData[dateKey];
+                }
+              }
+              
+              if(prevSum > 0) compareValue = prevSum;
+              if(currentSum > 0) lastTrafficForCalc = currentSum;
+            }
+            break;
+          case 'MoM':
+            // Month over Month: 최근 30일 합계 vs 이전 30일 합계
+            {
+              const periodDays = 30;
+              let currentSum = 0, prevSum = 0;
+              const lastIdx = data.allDates.length - 1;
+              
+              for(let d = 0; d < periodDays && (lastIdx - d) >= 0; d++){
+                const dateKey = data.allDates[lastIdx - d];
+                if(countryData[dateKey] !== undefined){
+                  currentSum += countryData[dateKey];
+                }
+              }
+              for(let d = periodDays; d < periodDays * 2 && (lastIdx - d) >= 0; d++){
+                const dateKey = data.allDates[lastIdx - d];
+                if(countryData[dateKey] !== undefined){
+                  prevSum += countryData[dateKey];
+                }
+              }
+              
+              if(prevSum > 0) compareValue = prevSum;
+              if(currentSum > 0) lastTrafficForCalc = currentSum;
+            }
+            break;
+          case 'QoQ':
+            // Quarter over Quarter: 최근 90일 합계 vs 이전 90일 합계
+            {
+              const periodDays = 90;
+              let currentSum = 0, prevSum = 0;
+              const lastIdx = data.allDates.length - 1;
+              
+              for(let d = 0; d < periodDays && (lastIdx - d) >= 0; d++){
+                const dateKey = data.allDates[lastIdx - d];
+                if(countryData[dateKey] !== undefined){
+                  currentSum += countryData[dateKey];
+                }
+              }
+              for(let d = periodDays; d < periodDays * 2 && (lastIdx - d) >= 0; d++){
+                const dateKey = data.allDates[lastIdx - d];
+                if(countryData[dateKey] !== undefined){
+                  prevSum += countryData[dateKey];
+                }
+              }
+              
+              if(prevSum > 0) compareValue = prevSum;
+              if(currentSum > 0) lastTrafficForCalc = currentSum;
+            }
+            break;
+          case 'YoY':
+            compareDateObj.setFullYear(compareDateObj.getFullYear() - 1);
+            const yoyDates = data.allDates.filter(d => {
+              const dObj = new Date(d);
+              const diff = Math.abs((dObj - compareDateObj) / (1000 * 60 * 60 * 24));
+              return diff <= 7;
+            });
+            if(yoyDates.length > 0){
+              const closestDate = yoyDates.sort((a,b) => {
+                const aDiff = Math.abs((new Date(a) - compareDateObj) / (1000 * 60 * 60 * 24));
+                const bDiff = Math.abs((new Date(b) - compareDateObj) / (1000 * 60 * 60 * 24));
+                return aDiff - bDiff;
+              })[0];
+              if(countryData[closestDate] !== undefined){
+                compareValue = countryData[closestDate];
+              }
+            }
+            break;
+        }
+      }
+      
+      const change = (compareValue !== null && compareValue > 0 && lastTrafficForCalc > 0) 
+        ? ((lastTrafficForCalc - compareValue) / compareValue) * 100 
+        : 0;
+      const continent = getContinent(country);
+      
+      // Get traffic history (countryDataMap 사용)
+      const trafficHistory = [];
+      data.allDates.forEach((date) => {
+        if(countryData[date] !== undefined){
+          trafficHistory.push({
+            date: date,
+            traffic: countryData[date]
+          });
+        }
+      });
+      
+      // Update stats
+      // 동적 단위 포맷 함수
+      function formatTraffic(value) {
+        if(value >= 1e9) return (value / 1e9).toFixed(2) + 'B';
+        if(value >= 1e6) return (value / 1e6).toFixed(2) + 'M';
+        if(value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+        return value.toFixed(0);
+      }
+      
+      // 기간 합계 여부에 따른 라벨/값 결정
+      const isPeriodSum = ['WoW', 'MoM', 'QoQ'].includes(comparisonType);
+      const displayValue = isPeriodSum ? lastTrafficForCalc : lastTraffic;
+      const trafficLabel = isPeriodSum 
+        ? `Traffic (${comparisonType === 'WoW' ? '7일' : comparisonType === 'MoM' ? '30일' : '90일'} 합계)`
+        : 'Current Traffic';
+      
+      const statsHTML = `
+        <div class="detail-stat-item">
+          <div class="detail-stat-label">${trafficLabel}</div>
+          <div class="detail-stat-value">${formatTraffic(displayValue)}</div>
+        </div>
+        <div class="detail-stat-item">
+          <div class="detail-stat-label">Change (${comparisonType})</div>
+          <div class="detail-stat-value" style="color:${change >= 0 ? '#00ff00' : '#ff4d4d'}">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</div>
+        </div>
+        <div class="detail-stat-item">
+          <div class="detail-stat-label">Sector</div>
+          <div class="detail-stat-value" style="font-size:18px">${continent}</div>
+        </div>
+        <div class="detail-stat-item">
+          <div class="detail-stat-label">Data Points</div>
+          <div class="detail-stat-value" style="font-size:18px">${trafficHistory.length}</div>
+        </div>
+      `;
+      
+      document.getElementById('countryDetailStats').innerHTML = statsHTML;
+      
+      // Update chart
+      if(trafficHistory.length > 0){
+        const trace = {
+          x: trafficHistory.map(d => d.date),
+          y: trafficHistory.map(d => d.traffic),
+          type: 'scatter',
+          mode: 'lines+markers',
+          name: country,
+          line: {color: change >= 0 ? '#00ff00' : '#ff4d4d', width: 2},
+          marker: {size: 6, color: change >= 0 ? '#00ff00' : '#ff4d4d'}
+        };
+        
+        const layout = {
+          paper_bgcolor: '#262931',
+          plot_bgcolor: '#262931',
+          font: {color: '#fff', family: 'Arial, Helvetica, sans-serif'},
+          xaxis: {gridcolor: '#30363d', title: 'Date'},
+          yaxis: {gridcolor: '#30363d', title: 'Traffic'},
+          margin: {l: 60, r: 20, t: 20, b: 50},
+          hovermode: 'closest'
+        };
+        
+        Plotly.newPlot('countryTrafficChart', [trace], layout, {responsive: true});
+      }
+      
+      document.getElementById('countryDetailContent').style.display = 'block';
+      document.getElementById('countryDetailEmpty').style.display = 'none';
+    }
+
+    // ---------- News & Headlines Tab ----------
+    let allNewsData = []; // 전체 뉴스 데이터 저장
+    let currentCategoryFilter = 'all'; // 현재 선택된 카테고리
+    let currentNewsTypeFilter = 'all'; // 현재 선택된 뉴스 타입 (all, traffic_impact, gaming)
+    
+    // 그룹별 색상 정의
+    const groupColors = {
+      'outage_block': '#ff4757',
+      'social_crisis': '#ffa502',
+      'seasonal_calendar': '#2ed573',
+      'gaming_competitor': '#5352ed',
+      'other': '#95a5a6'
+    };
+    
+    // 뉴스 타입별 스타일 정의
+    const newsTypeStyles = {
+      'traffic_impact': { icon: '⚡', label: '트래픽 영향', color: '#ff6b6b', bgColor: 'rgba(255,107,107,0.15)' },
+      'gaming': { icon: '🎮', label: '게임 뉴스', color: '#5352ed', bgColor: 'rgba(83,82,237,0.15)' }
+    };
+    
+    // category_group 매핑 함수 (한 번만 정의, 재사용)
+    const mapToGroupCategory = (detailCategory) => {
+      const outageBlock = ['internet_shutdown', 'tech_outage', 'power_outage', 'censorship', 'cyber_attack', 'infrastructure_damage'];
+      const socialCrisis = ['war_conflict', 'terrorism_explosion', 'natural_disaster', 'protest_strike', 'curfew', 'pandemic', 'economic'];
+      const seasonalCalendar = ['holiday', 'school_calendar', 'election'];
+      const gamingCompetitor = ['gaming', 'competitor_game', 'social_trend', 'sports_event', 'major_event'];
+      
+      if (outageBlock.includes(detailCategory)) return 'outage_block';
+      if (socialCrisis.includes(detailCategory)) return 'social_crisis';
+      if (seasonalCalendar.includes(detailCategory)) return 'seasonal_calendar';
+      if (gamingCompetitor.includes(detailCategory)) return 'gaming_competitor';
+      return 'other';
+    };
+    
+    // 뉴스 타입 추론 함수
+    const inferNewsType = (news) => {
+      // CSV에 news_type이 있으면 사용
+      if (news.news_type) return news.news_type;
+      
+      // category_group으로 추론
+      const group = news.category_group || mapToGroupCategory(news.category || 'other');
+      
+      // 트래픽 영향 관련 그룹
+      if (['outage_block', 'social_crisis', 'seasonal_calendar'].includes(group)) {
+        return 'traffic_impact';
+      }
+      
+      // 게임 관련
+      return 'gaming';
+    };
+    
+    // CSV에서 뉴스 로드
+    async function loadNewsFromCSV(){
+      const newsList = document.getElementById('newsList');
+      
+      // 로딩 표시
+      newsList.innerHTML = `
+        <div class="empty-state">
+          <div class="loading-spinner" style="margin:0 auto"></div>
+          <div style="margin-top:12px">뉴스를 불러오는 중...</div>
+        </div>
+      `;
+      
+      try {
+        const fetchStartTime = performance.now();
+        const response = await fetch('data/news.csv');
+        if(!response.ok){
+          throw new Error('뉴스 파일을 찾을 수 없습니다.');
+        }
+        
+        const csvText = await response.text();
+        const fetchTime = performance.now() - fetchStartTime;
+        console.log(`CSV 파일 fetch 시간: ${fetchTime.toFixed(2)}ms`);
+        
+        // CSV 파싱 시작 시간 측정
+        const parseStartTime = performance.now();
+        
+        Papa.parse(csvText, {
+          header: true,
+          skipEmptyLines: true,
+          worker: false, // 워커 스레드 사용 안 함 (작은 파일)
+          complete: (results) => {
+            const parseTime = performance.now() - parseStartTime;
+            console.log(`CSV 파싱 시간: ${parseTime.toFixed(2)}ms`);
+            
+            // category_group 매핑은 전역 함수 사용 (중복 제거)
+            
+            const mapStartTime = performance.now();
+            // HTML 태그 제거를 위한 정규식 (한 번만 컴파일)
+            const htmlTagRegex = /<[^>]*>/g;
+            
+            allNewsData = results.data.map(row => {
+              // HTML 태그 제거 (summary에서) - 정규식 재사용
+              const cleanSummary = (row.summary || '').replace(htmlTagRegex, '').trim();
+              const cleanTitle = (row.title || '').replace(htmlTagRegex, '').trim();
+              
+              const category = row.category || 'other';
+              // category_group이 CSV에 없으면 자동 매핑 (전역 함수 사용)
+              const categoryGroup = row.category_group || mapToGroupCategory(category);
+              
+              const newsItem = {
+                date: row.date || '',
+                country: row.country || '',
+                continent: row.continent || '',
+                title: cleanTitle,
+                summary: cleanSummary,
+                url: row.url || '#',
+                source: row.source || 'Unknown',
+                category: category,
+                category_group: categoryGroup,
+                news_type: row.news_type || '', // CSV에서 news_type 로드
+                traffic_impact: row.traffic_impact || '',
+                priority: row.priority || 'medium'
+              };
+              
+              // news_type이 없으면 추론
+              if (!newsItem.news_type) {
+                newsItem.news_type = inferNewsType(newsItem);
+              }
+              
+              return newsItem;
+            });
+            const mapTime = performance.now() - mapStartTime;
+            console.log(`데이터 매핑 시간: ${mapTime.toFixed(2)}ms`);
+            
+            // 통계 계산
+            const groupStats = {};
+            let trafficCount = 0;
+            let gamingCount = 0;
+            
+            allNewsData.forEach(news => {
+              const group = news.category_group || 'other';
+              groupStats[group] = (groupStats[group] || 0) + 1;
+              
+              if (news.news_type === 'traffic_impact') trafficCount++;
+              else gamingCount++;
+            });
+            
+            console.log('카테고리 그룹별 뉴스 수:', groupStats);
+            console.log(`뉴스 타입: 트래픽 영향 ${trafficCount}개, 게임 ${gamingCount}개`);
+            
+            // 통계 UI 업데이트
+            document.getElementById('totalNewsCount').textContent = allNewsData.length;
+            document.getElementById('trafficNewsCount').textContent = trafficCount;
+            document.getElementById('gamingNewsCount').textContent = gamingCount;
+            
+            applyNewsFilters();
+            
+            // 트래픽 영향 요약 생성
+            generateTrafficSummary(allNewsData);
+          },
+          error: (error) => {
+            console.error('CSV 파싱 오류:', error);
+            newsList.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-state-icon">⚠️</div>
+                <div>뉴스를 불러올 수 없습니다.</div>
+                <div style="margin-top:12px;font-size:12px;color:var(--muted)">${error.message}</div>
+              </div>
+            `;
+          }
+        });
+      } catch(error){
+        console.error('뉴스 로드 오류:', error);
+        newsList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">⚠️</div>
+            <div>뉴스를 불러올 수 없습니다.</div>
+            <div style="margin-top:12px;font-size:12px;color:var(--muted)">${error.message}</div>
+          </div>
+        `;
+      }
+    }
+    
+    // 통합 필터 적용 함수
+    function applyNewsFilters(){
+      const filterStartTime = performance.now();
+      
+      let filteredNews = allNewsData;
+      
+      // 1. 뉴스 타입 필터링
+      if(currentNewsTypeFilter !== 'all'){
+        filteredNews = filteredNews.filter(news => news.news_type === currentNewsTypeFilter);
+      }
+      
+      // 2. 카테고리 필터링
+      if(currentCategoryFilter !== 'all'){
+        filteredNews = filteredNews.filter(news => {
+          if (!news.category_group) {
+            news.category_group = mapToGroupCategory(news.category || 'other');
+          }
+          return news.category_group === currentCategoryFilter;
+        });
+      }
+      
+      // 날짜순 정렬 (최신순)
+      filteredNews.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        return isNaN(dateB) ? -1 : (isNaN(dateA) ? 1 : dateB - dateA);
+      });
+      
+      const filterTime = performance.now() - filterStartTime;
+      console.log(`필터링 시간: ${filterTime.toFixed(2)}ms, 결과: ${filteredNews.length}개`);
+      
+      renderNews(filteredNews);
+    }
+    
+    // 뉴스 타입 필터링 (새 카드 UI)
+    function filterNewsByType(type){
+      currentNewsTypeFilter = type;
+      
+      // 뉴스 타입 카드 버튼 활성화 상태 업데이트
+      document.querySelectorAll('.news-type-filter').forEach(btn => {
+        const btnType = btn.dataset.type;
+        if(btnType === type){
+          btn.classList.add('active');
+          if(btnType === 'all'){
+            btn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+          } else if(btnType === 'traffic_impact'){
+            btn.style.background = 'linear-gradient(135deg,#ff6b6b,#ee5a24)';
+            btn.style.color = '#fff';
+            btn.style.border = '2px solid #ff6b6b';
+          } else if(btnType === 'gaming'){
+            btn.style.background = 'linear-gradient(135deg,#5352ed,#3742fa)';
+            btn.style.color = '#fff';
+            btn.style.border = '2px solid #5352ed';
+          }
+        } else {
+          btn.classList.remove('active');
+          btn.style.background = 'var(--panel)';
+          if(btnType === 'all'){
+            btn.style.color = 'var(--muted)';
+            btn.style.border = '1px solid var(--border)';
+          } else if(btnType === 'traffic_impact'){
+            btn.style.color = '#ff6b6b';
+            btn.style.border = '2px solid #ff6b6b';
+          } else if(btnType === 'gaming'){
+            btn.style.color = '#5352ed';
+            btn.style.border = '2px solid #5352ed';
+          }
+        }
+      });
+      
+      applyNewsFilters();
+    }
+    
+    // 카테고리 필터 토글
+    document.getElementById('toggleCategoryFilter')?.addEventListener('click', function(){
+      const section = document.getElementById('categoryFilterSection');
+      const icon = document.getElementById('categoryToggleIcon');
+      if(section.style.display === 'none'){
+        section.style.display = 'block';
+        icon.textContent = '▲';
+      } else {
+        section.style.display = 'none';
+        icon.textContent = '▼';
+      }
+    });
+    
+    // 마크다운을 HTML로 변환하는 함수
+    function markdownToHtml(text) {
+      if (!text) return '';
+      return text
+        // 볼드체 **text** -> <strong>text</strong>
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        // 이탤릭 *text* -> <em>text</em>
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        // 리스트 * item -> • item
+        .replace(/^\* /gm, '• ')
+        // 줄바꿈 유지
+        .replace(/\n/g, '<br>');
+    }
+    
+    // 트래픽 영향 요약 생성 (summary.json 로드)
+    async function generateTrafficSummary(newsData){
+      const summaryContent = document.getElementById('trafficSummaryContent');
+      const summaryMeta = document.getElementById('trafficSummaryMeta');
+      
+      // 로딩 표시
+      summaryContent.innerHTML = `<div style="color:var(--muted)">🔄 AI 요약 로딩 중...</div>`;
+      
+      try {
+        // summary.json 로드 시도
+        const response = await fetch('data/summary.json');
+        
+        if(response.ok){
+          const summaryData = await response.json();
+          
+          if(!summaryData.has_issues){
+            // 특이사항 없음
+            summaryContent.innerHTML = `
+              <div style="color:#2ed573;font-size:18px;margin-bottom:12px">✅ <strong>특이사항 없음</strong></div>
+              <div style="color:var(--text);font-size:14px;line-height:1.6">${summaryData.summary || '최근 24시간 동안 모바일 게임 트래픽에 영향을 줄 만한 주요 이슈가 감지되지 않았습니다.'}</div>
+            `;
+            summaryMeta.style.display = 'none';
+          } else {
+            // AI 요약 표시
+            let html = '';
+            
+            // 전문가 분석 섹션
+            html += `<div style="margin-bottom:20px">`;
+            html += `<div style="font-weight:700;color:#5352ed;margin-bottom:12px;font-size:15px">🥽 GPT + CLAUDE 분석 의견</div>`;
+            html += `<div style="padding:16px;background:linear-gradient(135deg,rgba(83,82,237,0.1),rgba(46,213,115,0.05));border-radius:12px;border-left:4px solid #5352ed;font-size:14px;line-height:1.8">`;
+            html += markdownToHtml(summaryData.summary) || '분석 데이터 없음';
+            html += `</div></div>`;
+            
+            // 영향 국가
+            if(summaryData.affected_countries && summaryData.affected_countries.length > 0){
+              const validCountries = summaryData.affected_countries.filter(c => c && c !== 'Unknown' && c !== 'nan');
+              if(validCountries.length > 0){
+                html += `<div style="margin-bottom:16px">`;
+                html += `<div style="font-weight:700;color:#ffa502;margin-bottom:8px">🌍 주요 영향 국가</div>`;
+                html += `<div style="display:flex;flex-wrap:wrap;gap:8px">`;
+                validCountries.forEach(country => {
+                  html += `<span style="padding:6px 12px;background:rgba(255,165,2,0.15);border-radius:20px;font-size:13px;color:#ffa502">${country}</span>`;
+                });
+                html += `</div></div>`;
+              }
+            }
+            
+            // 주요 이슈 목록
+            if(summaryData.key_issues && summaryData.key_issues.length > 0){
+              html += `<div>`;
+              html += `<div style="font-weight:700;color:#ff6b6b;margin-bottom:8px">📌 주요 이슈</div>`;
+              summaryData.key_issues.forEach(issue => {
+                const title = typeof issue === 'string' ? issue : issue.title;
+                const country = typeof issue === 'object' ? issue.country : '';
+                html += `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px">`;
+                if(country && country !== 'Unknown'){
+                  html += `<span style="background:rgba(255,107,107,0.2);color:#ff6b6b;padding:2px 8px;border-radius:4px;margin-right:8px;font-size:11px">${country}</span>`;
+                }
+                html += `<span>${title}</span>`;
+                html += `</div>`;
+              });
+              html += `</div>`;
+            }
+            
+            summaryContent.innerHTML = html;
+            summaryMeta.style.display = 'block';
+            
+            // 메타 정보 업데이트
+            const generatedAt = summaryData.generated_at ? new Date(summaryData.generated_at).toLocaleString('ko-KR') : new Date().toLocaleString('ko-KR');
+            document.getElementById('summaryTime').textContent = generatedAt;
+            document.getElementById('summaryNewsCount').textContent = summaryData.news_count || 0;
+          }
+        } else {
+          throw new Error('summary.json not found');
+        }
+      } catch(error){
+        console.log('summary.json 로드 실패, 기본 분석 수행:', error);
+        
+        // Fallback: 클라이언트 측 기본 분석
+        generateTrafficSummaryFallback(newsData);
+      }
+    }
+    
+    // Fallback: 클라이언트 측 기본 분석 (summary.json 없을 때)
+    function generateTrafficSummaryFallback(newsData){
+      const excludeKeywords = [
+        'mama', 'awards', '시상식', 'concert', '콘서트', 'idol', '아이돌',
+        '광고', '캠페인', '프로모션', '증시', '코스피', '채용', '분양',
+        'immigration protest', 'hindu protest', 'farmer protest',
+        'kt 위즈', '프로야구', '프로축구', 'nba', 'mlb',
+        // 배구
+        'spike war', '스파이크 워', '배구', 'volleyball', 'v리그',
+        "kim yo-han's serve", '서브 리시브',
+        // ※ 북한 사이버 공격은 게임 서버 영향 가능성 있어 살림!
+        // 정치/법원
+        'ppp', '국민의힘', '더불어민주당', '민주당', '국회',
+        'court hearing', '법원', '재판', '탄핵', 'choo kyung-ho',
+        '추경호', '이재명', '윤석열', '한동훈', 'impeachment',
+        // 한국 관련 (글로벌 관점에서 제외)
+        '한국', 'south korea', 'korea', '북한', 'north korea',
+        '서울', 'seoul', '네이트', 'nate.com',
+        // e스포츠
+        'esports', 'e-sports', 'e스포츠', '이스포츠',
+        'pmgc', 'pmpl', 'tournament', '토너먼트', '대회',
+        'championship', 'league', '리그', '프로선수', '프로팀'
+      ];
+      
+      const seenTitles = new Set();
+      const trafficNews = newsData.filter(n => {
+        if(n.news_type !== 'traffic_impact') return false;
+        const title = (n.title || '').toLowerCase();
+        const titleKey = title.substring(0, 30);
+        if(seenTitles.has(titleKey)) return false;
+        seenTitles.add(titleKey);
+        if(excludeKeywords.some(kw => title.includes(kw))) return false;
+        return true;
+      });
+      
+      const summaryContent = document.getElementById('trafficSummaryContent');
+      const summaryMeta = document.getElementById('trafficSummaryMeta');
+      
+      if(trafficNews.length === 0){
+        summaryContent.innerHTML = `
+          <div style="color:#2ed573;font-size:18px;margin-bottom:12px">✅ <strong>특이사항 없음</strong></div>
+          <div style="color:var(--text);font-size:14px">최근 24시간 동안 트래픽에 영향을 줄 만한 주요 이슈가 없습니다.</div>
+        `;
+        summaryMeta.style.display = 'none';
+        return;
+      }
+      
+      // 국가별 분류
+      const countries = {};
+      trafficNews.forEach(news => {
+        const country = news.country || 'Unknown';
+        if(country && country !== 'Unknown' && country !== 'nan'){
+          if(!countries[country]) countries[country] = [];
+          countries[country].push(news);
+        }
+      });
+      
+      const topCountries = Object.keys(countries).sort((a,b) => countries[b].length - countries[a].length).slice(0, 5);
+      
+      let html = `<div style="padding:12px;background:rgba(255,165,2,0.1);border-radius:8px;margin-bottom:16px">`;
+      html += `<div style="color:#ffa502;font-weight:600;margin-bottom:8px">⚠️ AI 요약 미생성</div>`;
+      html += `<div style="font-size:13px;color:var(--text)">로컬에서 뉴스 수집 스크립트를 실행하면 AI 요약이 생성됩니다.</div>`;
+      html += `</div>`;
+      
+      html += `<div style="margin-bottom:12px">`;
+      html += `<strong>📊 기본 분석:</strong> 트래픽 영향 뉴스 ${trafficNews.length}건 감지`;
+      html += `</div>`;
+      
+      if(topCountries.length > 0){
+        html += `<div><strong>🌍 영향 국가:</strong> ${topCountries.join(', ')}</div>`;
+      }
+      
+      summaryContent.innerHTML = html;
+      summaryMeta.style.display = 'block';
+      document.getElementById('summaryTime').textContent = new Date().toLocaleString('ko-KR');
+      document.getElementById('summaryNewsCount').textContent = trafficNews.length;
+    }
+    
+    // 카테고리별 필터링 (그룹 카테고리 기준)
+    function filterNewsByCategory(category){
+      currentCategoryFilter = category;
+      
+      // 카테고리 버튼 활성화 상태 업데이트
+      document.querySelectorAll('.category-filter').forEach(btn => {
+        if(btn.dataset.category === category){
+          btn.classList.add('active');
+          if(category === 'all'){
+            btn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+          } else {
+            const groupColor = groupColors[category] || groupColors['other'];
+            btn.style.background = groupColor;
+            btn.style.color = '#fff';
+            btn.style.border = `2px solid ${groupColor}`;
+          }
+        } else {
+          btn.classList.remove('active');
+          if(btn.dataset.category === 'all'){
+            btn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
+            btn.style.color = '#fff';
+            btn.style.border = 'none';
+          } else {
+            const groupColor = groupColors[btn.dataset.category] || groupColors['other'];
+            btn.style.background = 'var(--panel)';
+            btn.style.color = groupColor;
+            btn.style.border = `2px solid ${groupColor}`;
+          }
+        }
+      });
+      
+      applyNewsFilters();
+    }
+    
+    // 뉴스 타입 필터 이벤트 리스너
+    document.querySelectorAll('.news-type-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterNewsByType(btn.dataset.type);
+      });
+    });
+    
+    // 카테고리 필터 이벤트 리스너
+    document.querySelectorAll('.category-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterNewsByCategory(btn.dataset.category);
+      });
+    });
+    
+    async function loadNews(countries = null){
+      // CSV에서 뉴스 로드 (기존 API 방식 대체)
+      try {
+        await loadNewsFromCSV();
+      } catch(error) {
+        console.error('뉴스 로드 실패:', error);
+        renderSampleNews(countries);
+      }
+    }
+
+    // RSS 피드에서 뉴스 가져오기 (API 키 불필요)
+    async function fetchNewsFromRSS(countries = null){
+      const news = [];
+      
+      try {
+        // 검색 키워드 생성
+        let searchTerms = 'PUBG Mobile mobile game';
+        if(countries && countries.length > 0){
+          // 상승 국가와 하락 국가를 구분하여 검색
+          const risers = countries.filter(c => c.type === 'riser').map(c => c.country);
+          const fallers = countries.filter(c => c.type === 'faller').map(c => c.country);
+          
+          if(risers.length > 0){
+            searchTerms += ` (${risers.slice(0, 3).join(' OR ')})`;
+          }
+        }
+        
+        // 여러 RSS 소스 시도 (CORS 프록시 사용)
+        const corsProxies = [
+          'https://api.allorigins.win/get?url=',
+          'https://corsproxy.io/?',
+          'https://api.codetabs.com/v1/proxy?quest='
+        ];
+        
+        const rssUrls = [
+          // Google News RSS - PUBG Mobile 검색
+          `https://news.google.com/rss/search?q=${encodeURIComponent(searchTerms)}&hl=ko&gl=KR&ceid=KR:ko`,
+          // Google News RSS - 모바일 게임 일반
+          `https://news.google.com/rss/search?q=${encodeURIComponent('mobile game traffic')}&hl=ko&gl=KR&ceid=KR:ko`,
+        ];
+        
+        // 각 프록시와 RSS 소스 조합 시도
+        for(const rssUrl of rssUrls){
+          for(const proxy of corsProxies){
+            try {
+              const fullUrl = proxy + encodeURIComponent(rssUrl);
+              const response = await fetch(fullUrl, {
+                method: 'GET',
+                headers: {
+                  'Accept': 'application/json'
+                }
+              });
+              
+              if(!response.ok) continue;
+              
+              const data = await response.json();
+              const xmlContent = data.contents || data || '';
+              
+              // RSS 파싱
+              const parser = new DOMParser();
+              const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+              
+              // 파싱 오류 확인
+              const parseError = xmlDoc.querySelector('parsererror');
+              if(parseError) {
+                console.warn('XML 파싱 오류:', parseError.textContent);
+                continue;
+              }
+              
+              const items = xmlDoc.querySelectorAll('item');
+              
+              if(items.length === 0) continue;
+              
+              items.forEach((item, index) => {
+                if(index >= 15) return; // 최대 15개
+                
+                const title = item.querySelector('title')?.textContent || '';
+                const link = item.querySelector('link')?.textContent || 
+                           item.querySelector('guid')?.textContent || '#';
+                const pubDate = item.querySelector('pubDate')?.textContent || 
+                              item.querySelector('pubdate')?.textContent || '';
+                const description = item.querySelector('description')?.textContent || '';
+                const source = item.querySelector('source')?.textContent || 
+                             item.querySelector('dc\\:creator')?.textContent || 'Google News';
+                
+                // 중복 제거
+                if(news.some(n => n.title === title)) return;
+                
+                // 관련 국가 확인
+                let relatedCountry = null;
+                let changeType = null;
+                if(countries){
+                  for(const country of countries){
+                    const countryLower = country.country.toLowerCase();
+                    const titleLower = title.toLowerCase();
+                    const descLower = description.toLowerCase();
+                    
+                    if(titleLower.includes(countryLower) || descLower.includes(countryLower)){
+                      relatedCountry = country.country;
+                      changeType = country.type; // 'riser' or 'faller'
+                      break;
+                    }
+                  }
+                }
+                
+                // PUBG Mobile 관련 키워드 확인
+                const relevantKeywords = ['pubg', 'mobile game', 'mobile gaming', 'game traffic', 'dau', 'user'];
+                const isRelevant = relevantKeywords.some(keyword => 
+                  title.toLowerCase().includes(keyword) || description.toLowerCase().includes(keyword)
+                );
+                
+                // 관련성이 있거나 국가 태그가 있는 경우만 추가
+                if(isRelevant || relatedCountry){
+                  news.push({
+                    title: title.replace(/<[^>]*>/g, '').trim(),
+                    source: source.replace(/<[^>]*>/g, '').trim(),
+                    date: formatDate(pubDate),
+                    snippet: description.replace(/<[^>]*>/g, '').trim().substring(0, 200) + (description.length > 200 ? '...' : ''),
+                    url: link,
+                    relatedCountry: relatedCountry,
+                    changeType: changeType
+                  });
+                }
+              });
+              
+              if(news.length >= 10) break; // 충분한 뉴스가 있으면 중단
+            } catch(err) {
+              console.warn('RSS 소스 실패:', err.message);
+              continue;
+            }
+          }
+          
+          if(news.length >= 10) break; // 충분한 뉴스가 있으면 중단
+        }
+        
+        // 날짜순 정렬 (최신순)
+        news.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+      } catch(error) {
+        console.error('RSS 피드 가져오기 실패:', error);
+      }
+      
+      return news;
+    }
+
+    // Gemini API로 뉴스 검색 및 원인 분석 (API 키 필요, 무료 티어 사용 가능)
+    async function fetchNewsFromGemini(countries = null){
+      const apiKey = window.API_CONFIG?.GEMINI_API_KEY;
+      if(!apiKey || apiKey === 'YOUR_GEMINI_API_KEY_HERE') return null;
+      
+      try {
+        // 상승/하락 국가 구분
+        const risers = countries ? countries.filter(c => c.type === 'riser') : [];
+        const fallers = countries ? countries.filter(c => c.type === 'faller') : [];
+        
+        let prompt = `다음은 PUBG Mobile 게임의 국가별 트래픽 변화 데이터입니다:\n\n`;
+        
+        if(risers.length > 0){
+          prompt += `📈 트래픽이 5% 이상 상승한 국가:\n`;
+          risers.forEach(c => {
+            prompt += `- ${c.country}: ${c.change.toFixed(2)}% 상승\n`;
+          });
+          prompt += `\n이 국가들의 트래픽 상승 원인을 분석하고, 관련된 최신 뉴스나 이벤트를 찾아주세요.\n\n`;
+        }
+        
+        if(fallers.length > 0){
+          prompt += `📉 트래픽이 5% 이상 하락한 국가:\n`;
+          fallers.forEach(c => {
+            prompt += `- ${c.country}: ${c.change.toFixed(2)}% 하락\n`;
+          });
+          prompt += `\n이 국가들의 트래픽 하락 원인을 분석하고, 관련된 최신 뉴스나 이벤트를 찾아주세요.\n\n`;
+        }
+        
+        if(!risers.length && !fallers.length){
+          prompt += `PUBG Mobile의 글로벌 트래픽과 관련된 최신 뉴스를 찾아주세요.\n\n`;
+        }
+        
+        prompt += `다음 형식으로 JSON 배열로 응답해주세요 (각 뉴스마다):
+[
+  {
+    "title": "뉴스 제목",
+    "source": "출처",
+    "date": "날짜",
+    "snippet": "요약 (2-3문장)",
+    "url": "링크 (가능한 경우)",
+    "relatedCountry": "관련 국가 (없으면 null)",
+    "reason": "트래픽 변화 원인 분석 (상승/하락 이유)"
+  }
+]
+
+최근 24시간 이내의 뉴스만 포함하고, 실제로 존재하는 뉴스만 알려주세요. 최대 10개까지.`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 2048,
+            }
+          })
+        });
+        
+        if(!response.ok) {
+          throw new Error(`Gemini API 오류: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Gemini 응답에서 텍스트 추출
+        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        
+        if(!responseText) {
+          console.warn('Gemini 응답이 비어있습니다.');
+          return null;
+        }
+        
+        // JSON 파싱 시도 (마크다운 코드 블록 제거)
+        let jsonText = responseText.trim();
+        
+        // ```json 또는 ```로 감싸진 경우 제거
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        
+        // JSON 배열 추출 시도
+        const jsonMatch = jsonText.match(/\[[\s\S]*\]/);
+        if(jsonMatch) {
+          jsonText = jsonMatch[0];
+        }
+        
+        try {
+          const newsArray = JSON.parse(jsonText);
+          
+          // 뉴스 형식 변환
+          return newsArray.map(news => ({
+            title: news.title || '제목 없음',
+            source: news.source || 'Gemini AI',
+            date: news.date || new Date().toLocaleDateString('ko-KR'),
+            snippet: news.snippet || '',
+            url: news.url || '#',
+            relatedCountry: news.relatedCountry || null,
+            changeType: risers.some(c => c.country === news.relatedCountry) ? 'riser' : 
+                       fallers.some(c => c.country === news.relatedCountry) ? 'faller' : null,
+            reason: news.reason || null // 트래픽 변화 원인
+          }));
+        } catch(parseError) {
+          // JSON 파싱 실패 시 텍스트에서 뉴스 정보 추출 시도
+          console.warn('JSON 파싱 실패, 텍스트 파싱 시도:', parseError);
+          
+          // 간단한 텍스트 파싱 (폴백)
+          const newsItems = [];
+          const lines = responseText.split('\n').filter(l => l.trim());
+          
+          let currentNews = null;
+          for(const line of lines) {
+            if(line.includes('title') || line.includes('제목')) {
+              currentNews = { title: line.replace(/.*title.*[:：]\s*/i, '').trim() };
+            } else if(line.includes('source') || line.includes('출처')) {
+              if(currentNews) currentNews.source = line.replace(/.*source.*[:：]\s*/i, '').trim();
+            } else if(line.includes('reason') || line.includes('원인')) {
+              if(currentNews) currentNews.reason = line.replace(/.*reason.*[:：]\s*/i, '').trim();
+            }
+          }
+          
+          if(newsItems.length > 0) return newsItems;
+          
+          // 최종 폴백: Gemini 응답을 그대로 표시
+          return [{
+            title: 'Gemini AI 분석 결과',
+            source: 'Gemini AI',
+            date: new Date().toLocaleDateString('ko-KR'),
+            snippet: responseText.substring(0, 500) + '...',
+            url: '#',
+            relatedCountry: null,
+            reason: null
+          }];
+        }
+      } catch(error) {
+        console.error('Gemini API 호출 실패:', error);
+        return null;
+      }
+    }
+
+    // 날짜 포맷팅
+    function formatDate(dateString){
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
+      } catch {
+        return new Date().toLocaleDateString('ko-KR');
+      }
+    }
+
+    // 뉴스 렌더링
+    function renderNews(newsArray){
+      const renderStartTime = performance.now();
+      const newsList = document.getElementById('newsList');
+      
+      if(newsArray.length > 0){
+        // 세부 카테고리 아이콘
+        const categoryIcons = {
+          'internet_shutdown': '📡', 'tech_outage': '💻', 'power_outage': '⚡',
+          'censorship': '🚫', 'cyber_attack': '🛡️', 'infrastructure_damage': '🏗️',
+          'war_conflict': '⚔️', 'terrorism_explosion': '💣', 'natural_disaster': '🌊',
+          'protest_strike': '📢', 'curfew': '🚫', 'pandemic': '🦠', 'economic': '💰',
+          'holiday': '🎉', 'school_calendar': '📚', 'election': '🗳️',
+          'gaming': '🎮', 'competitor_game': '🎯', 'social_trend': '📱',
+          'sports_event': '⚽', 'major_event': '🎪',
+          'other': '📋'
+        };
+        
+        newsList.innerHTML = newsArray.map(news => {
+          const groupColor = groupColors[news.category_group] || groupColors['other'];
+          const categoryIcon = categoryIcons[news.category] || categoryIcons['other'];
+          const categoryName = news.category.replace(/_/g, ' ');
+          
+          // 뉴스 타입 스타일
+          const typeStyle = newsTypeStyles[news.news_type] || newsTypeStyles['gaming'];
+          const typeLabel = `<span style="padding:4px 10px;background:${typeStyle.bgColor};border:1px solid ${typeStyle.color};border-radius:4px;font-size:11px;color:${typeStyle.color};white-space:nowrap;font-weight:600">${typeStyle.icon} ${typeStyle.label}</span>`;
+          
+          return `
+          <div class="news-item" style="border-left:3px solid ${typeStyle.color}">
+            <div class="news-content">
+              <div class="news-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                ${typeLabel}
+                <a href="${news.url}" target="_blank" rel="noopener noreferrer" style="flex:1;min-width:200px">${news.title}</a>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                <span style="padding:4px 10px;background:${groupColor}15;border:1px solid ${groupColor}50;border-radius:4px;font-size:11px;color:${groupColor}">
+                  ${categoryIcon} ${categoryName}
+                </span>
+                ${news.country ? `<span style="padding:4px 10px;background:rgba(35,134,54,0.1);border:1px solid rgba(35,134,54,0.3);border-radius:4px;font-size:11px;color:#238636">🌍 ${news.country}</span>` : ''}
+                ${news.priority === 'high' ? `<span style="padding:3px 8px;background:rgba(255,107,107,0.15);border:1px solid rgba(255,107,107,0.3);border-radius:4px;font-size:10px;color:#ff6b6b">⚠️ HIGH</span>` : ''}
+              </div>
+              <div class="news-meta" style="margin-top:8px">
+                <span class="news-source">${news.source}</span>
+                <span class="news-date">${news.date}</span>
+                ${news.continent ? `<span style="color:var(--muted);font-size:11px">${news.continent}</span>` : ''}
+              </div>
+              <div class="news-snippet" style="margin-top:8px">${news.summary}</div>
+              ${news.traffic_impact ? `<div style="margin-top:10px;padding:10px;background:rgba(255,107,107,0.08);border-left:3px solid #ff6b6b;border-radius:4px;font-size:12px;color:var(--muted)"><strong style="color:#ff6b6b">📊 트래픽 영향 분석:</strong> ${news.traffic_impact}</div>` : ''}
+              <div style="margin-top:10px;display:flex;gap:8px">
+                <a href="${news.url}" target="_blank" rel="noopener noreferrer" style="padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:#fff;font-size:12px;text-decoration:none;transition:all 0.2s" onmouseover="this.style.borderColor='#238636'" onmouseout="this.style.borderColor='var(--border)'">📰 원문 보기</a>
+              </div>
+            </div>
+          </div>
+        `;
+        }).join('');
+        
+        const renderTime = performance.now() - renderStartTime;
+        console.log(`렌더링 시간: ${renderTime.toFixed(2)}ms, 뉴스 ${newsArray.length}개`);
+      } else {
+        newsList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📰</div>
+            <div>해당 필터에 맞는 뉴스가 없습니다.</div>
+            <div style="margin-top:12px;font-size:12px;color:var(--muted)">다른 필터를 선택해보세요.</div>
+          </div>
+        `;
+      }
+    }
+
+    // 샘플 뉴스 렌더링 (폴백)
+    function renderSampleNews(countries = null){
+      const newsList = document.getElementById('newsList');
+      const sampleNews = [
+        {
+          title: 'PUBG Mobile 글로벌 트래픽 증가 추세',
+          source: 'Gaming News',
+          date: new Date().toLocaleDateString('ko-KR'),
+          snippet: 'PUBG Mobile의 글로벌 트래픽이 지속적으로 증가하고 있습니다.',
+          url: '#',
+          relatedCountry: countries && countries.length > 0 ? countries[0].country : null
+        },
+        {
+          title: '모바일 게임 시장 동향 분석',
+          source: 'Tech Report',
+          date: new Date(Date.now() - 86400000).toLocaleDateString('ko-KR'),
+          snippet: '모바일 게임 시장의 트래픽 변화를 분석한 최신 리포트가 발표되었습니다.',
+          url: '#',
+          relatedCountry: null
+        }
+      ];
+      
+      renderNews(sampleNews);
+    }
+
+    // Load news for risers/fallers
+    function loadNewsForRisersFallers(data){
+      if(!data || !data.Country) return;
+      
+      const stats = calculateStats(data);
+      const threshold = 5;
+      
+      const risers = [];
+      const fallers = [];
+      
+      for(let i = 0; i < stats.topCountries.length; i++){
+        const change = stats.topChange[i];
+        const country = stats.topCountries[i];
+        
+        if(change >= threshold){
+          risers.push({country, change, type: 'riser'});
+        } else if(change <= -threshold){
+          fallers.push({country, change, type: 'faller'});
+        }
+      }
+      
+      // Combine risers and fallers for news API
+      const countriesForNews = [...risers, ...fallers];
+      loadNews(countriesForNews);
+    }
+
+
+    // Update tabs when data changes
+    const originalCreateTreemap = createTreemap;
+    createTreemap = function(data){
+      originalCreateTreemap(data);
+      // Update other tabs if they are active
+      if(document.getElementById('tab-risers-fallers').classList.contains('active')){
+        updateRisersFallers(data);
+      }
+      if(document.getElementById('tab-country-detail').classList.contains('active')){
+        updateCountrySelect(data);
+      }
+      if(document.getElementById('tab-news').classList.contains('active')){
+        loadNewsFromCSV();
+      }
+    };
+
+    // initial draw
+    window.addEventListener('load',()=>{
+      const t=overlay?.querySelector('.loading-text'); if(t) t.textContent='샘플 데이터로 초기화 중...';
+      setTimeout(()=> {
+        createTreemap(currentData);
+        updateCountrySelect(currentData);
+      }, 120);
+    });
+    </script>
+</body>
+</html>
