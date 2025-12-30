@@ -1,0 +1,15 @@
+# GitHub Pages 설정
+title: PUBG Mobile Revenue Treemap
+description: Interactive visualization of PUBG Mobile revenue data by country
+theme: jekyll-theme-minimal
+
+# GitHub Pages 활성화
+plugins:
+  - jekyll-feed
+
+# 빌드 설정
+markdown: kramdown
+highlighter: rouge
+
+# 기본 언어
+lang: ko
